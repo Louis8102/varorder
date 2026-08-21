@@ -11,4 +11,3 @@ license: GPL-3.0-only
 abstract: >-
   A Stata module for metadata-aware, ambiguity-aware automatic detection and
   safe temporal reorganization of variable families in wide-format datasets.
-
