@@ -6,13 +6,18 @@
 {title:Title}
 
 {phang}
-{bf:varorder} {hline 2} Automated detection of temporal structure and ordering of variables using semantic information in variable names, labels, and variable notes{p_end}
+{bf:varorder} {hline 2} Automated detection of temporal structure and ordering of variables
+using semantic information in variable names, labels, and variable notes{p_end}
 
 
 {title:Description}
 
 {pstd}
-This module automatically examines the current wide-format dataset, identifies variables with sufficiently clear temporal structure using semantic information from variable names, variable labels, variable notes, or agreement across these sources, and places eligible variables into a defensible temporal order. When the available information is ambiguous or conflicting, {cmd:varorder} reports the issue rather than guessing.{p_end}
+This module automatically examines the current wide-format dataset, identifies variables with
+sufficiently clear temporal structure using semantic information from variable names, variable
+labels, variable notes, or agreement across these sources, and places eligible variables into a
+defensible temporal order. When the available information is ambiguous or conflicting,
+{cmd:varorder} reports the issue rather than guessing.{p_end}
 
 
 {title:Why use varorder?}
@@ -29,13 +34,29 @@ temporal sequence, and reorganize them safely.{p_end}
 
 {title:Key features}
 
-{p 4 6 2}• {bf:Semantic detection from three metadata sources.} {cmd:varorder} uses semantic information in variable names, variable labels, and variable notes to identify variables that belong together and determine whether they contain a defensible temporal structure. Evidence may come from one source or from agreement across multiple sources.{p_end}
+{p 4 6 2}• {bf:Semantic detection from three metadata sources.} {cmd:varorder} uses semantic
+information in variable names, variable labels, and variable notes to identify variables that
+belong together and determine whether they contain a defensible temporal structure. Evidence may
+come from one source or from agreement across multiple sources.{p_end}
 
-{p 4 6 2}• {bf:Temporal and hierarchical ordering.} The command recognizes high-confidence temporal patterns such as {cmd:T1/T2/T3}, {cmd:Wave 1/2/3}, {cmd:Visit 1/2/3}, explicit calendar years, and sequences such as {cmd:pre < mid < post}. When multiple ordered temporal components are supported by the semantic information, {cmd:varorder} can use hierarchical keys such as {cmd:year > quarter}, {cmd:grade > term}, or {cmd:day > within-day period}. Bare numeric suffixes are not treated as temporal unless the available semantics support that interpretation.{p_end}
+{p 4 6 2}• {bf:Temporal and hierarchical ordering.} The command recognizes high-confidence
+temporal patterns such as {cmd:T1/T2/T3}, {cmd:Wave 1/2/3}, {cmd:Visit 1/2/3}, explicit calendar
+years, and sequences such as {cmd:pre < mid < post}. When multiple ordered temporal components are
+supported by the semantic information, {cmd:varorder} can use hierarchical keys such as
+{cmd:year > quarter}, {cmd:grade > term}, or {cmd:day > within-day period}. Bare numeric suffixes are
+not treated as temporal unless the available semantics support that interpretation.{p_end}
 
-{p 4 6 2}• {bf:Metadata normalization across names, labels, and notes.} Formatting inconsistencies such as capitalization, separators, compact forms, and leading zeros may occur in any metadata source. {cmd:varorder} normalizes such differences internally for detection while preserving the original variable names, labels, and notes and retaining each source separately so that agreement and conflict remain detectable.{p_end}
+{p 4 6 2}• {bf:Metadata normalization across names, labels, and notes.} Formatting inconsistencies
+such as capitalization, separators, compact forms, and leading zeros may occur in any metadata
+source. {cmd:varorder} normalizes such differences internally for detection while preserving the
+original variable names, labels, and notes and retaining each source separately so that agreement
+and conflict remain detectable.{p_end}
 
-{p 4 6 2}• {bf:Dataset safety.} {cmd:varorder} acts only when temporal evidence is sufficiently clear. Related but non-temporal variables, semantically insufficient numeric sequences, ambiguous hierarchical structures, normalized-key collisions, and metadata conflicts are reported for review rather than guessed into an order. The command is preview-first, proposes one complete ordering plan, asks for at most one confirmation, and changes only the physical order of variables.{p_end}
+{p 4 6 2}• {bf:Dataset safety.} {cmd:varorder} acts only when temporal evidence is sufficiently
+clear. Related but non-temporal variables, semantically insufficient numeric sequences, ambiguous
+hierarchical structures, normalized-key collisions, and metadata conflicts are reported for review
+rather than guessed into an order. The command is preview-first, proposes one complete ordering
+plan, asks for at most one confirmation, and changes only the physical order of variables.{p_end}
 
 
 {title:Syntax}
@@ -53,21 +74,27 @@ temporal sequence, and reorganize them safely.{p_end}
 
 {p 8 8 2}{txt:varorder preview summary}{p_end}
 {p 8 8 2}{txt:  Examined: 100 variables; candidate structures: 28}{p_end}
-{p 8 8 2}{txt:  Confirmed: 18; stems: alg, anxiety, bp, depression, health, math (3), memory_time, mobility, read, reading, sales, score (+3 stems omitted)}{p_end}
+{p 8 8 2}{txt:  Confirmed: 18; stems: alg, anxiety, bp, depression, health, math (3),}
+{txt:  memory_time, mobility, read, reading, sales, score (+3 stems omitted)}{p_end}
 {p 8 8 2}{txt:  Gap warning - ordering allowed (1): mobility: missing indexed position}{p_end}
-{p 8 8 2}{txt:  Related/unverified - no action (5): eng: non-temporal meaning established; exercise: temporal meaning unverified; lab: non-temporal meaning established; mood: temporal meaning unverified; reading: non-temporal meaning established}{p_end}
-{p 8 8 2}{txt:  Ambiguous/conflicting - no action (5): focus: construct conflict; memory: metadata conflict; pain: normalized-key collision; score: construct conflict; survey: metadata conflict}{p_end}
+{p 8 8 2}{txt:  Related/unverified - no action (5): eng: non-temporal meaning established;}
+{txt:  exercise: temporal meaning unverified; lab: non-temporal meaning established;}
+{txt:  mood: temporal meaning unverified; reading: non-temporal meaning established}{p_end}
+{p 8 8 2}{txt:  Ambiguous/conflicting - no action (5): focus: construct conflict;}
+{txt:  memory: metadata conflict; pain: normalized-key collision; score: construct conflict;}
+{txt:  survey: metadata conflict}{p_end}
 {p 8 8 2}{txt:  Proposed: 18 structures; 98 variables; maximum displacement 90 columns}{p_end}
 
 {p 8 8 2}{txt:If you want to proceed, please press Enter.}{p_end}
 
 {pstd}
 After the user reviews the one summary and presses Enter, the already frozen
-plan is applied once.  The command then prints only the following postview
+plan is applied once.  The command then prints only the following post-operation
 summary:{p_end}
 
-{p 8 8 2}{txt:varorder postview summary}{p_end}
-{p 8 8 2}{txt:  Updated: yes; examined 100; reorganized 18; moved 98; maximum displacement 90 columns}{p_end}
+{p 8 8 2}{txt:varorder post-operation summary}{p_end}
+{p 8 8 2}{txt:  Updated: yes; examined 100; reorganized 18; moved 98;}
+{txt:  maximum displacement 90 columns}{p_end}
 
 {pstd}
 Ordinary confirmed structures are summarized by count and normalized family name.
@@ -134,4 +161,5 @@ Ma, H. (2026). {it:varorder: Automated semantic detection and temporal ordering 
 {title:License}
 
 {pstd}
-{cmd:varorder} is free software licensed under the GNU General Public License version 3 (GPL-3.0).{p_end}
+{cmd:varorder} is free software licensed under the GNU General Public License version 3
+(GPL-3.0).{p_end}
