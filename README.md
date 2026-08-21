@@ -70,22 +70,28 @@ The validated example-data preview is a bounded summary:
 
 ```text
 varorder preview summary
-  Examined: 100 variables; candidate structures: 28
-  Confirmed: 18; stems: alg, anxiety, bp, depression, health, math (3), memory_time, mobility, read, reading, sales, score (+3 stems omitted)
-  Gap warning - ordering allowed (1): mobility: missing indexed position
-  Related/unverified - no action (5): [bounded stem and reason summary]
-  Ambiguous/conflicting - no action (5): [bounded stem and reason summary]
-  Proposed: 18 structures; 98 variables; maximum displacement 90 columns
 
-If you want to proceed, please press Enter.
+Examined: 100 variables
+Confirmed temporal structures: 18
+Variables to be reordered: 98
+Maximum displacement: 90 columns
+
+Issues requiring review:
+  Gap warnings but ordering allowed (1): mobility
+  Related/unverified — no action (5): eng, exercise, lab, mood, reading
+  Ambiguous/conflicting — no action (5): focus, memory, pain, score, survey
+
+All eligible structures will be included in the proposed ordering. Structures marked as no action will remain unchanged.
+
+
+Press Enter to apply the proposed ordering.
 ```
 
 Pressing Enter in an interactive Stata session applies the frozen plan once and
-prints a minimal postview:
+prints only:
 
 ```text
-varorder postview summary
-  Updated: yes; examined 100; reorganized 18; moved 98; maximum displacement 90 columns
+Variable order updated.
 ```
 
 No variable-by-variable movement listing is printed. In noninteractive batch
