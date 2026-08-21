@@ -73,34 +73,24 @@ plan, asks for at most one confirmation, and changes only the physical order of 
 {p 4 4 2}{cmd:. varorder}{p_end}
 
 {p 8 8 2}{txt:varorder preview summary}{p_end}
-{p 8 8 2}{txt:  Examined: 100 variables; candidate structures: 28}{p_end}
-{p 8 8 2}{txt:  Confirmed: 18; stems: alg, anxiety, bp, depression, health, math (3),}
-{txt:  memory_time, mobility, read, reading, sales, score (+3 stems omitted)}{p_end}
-{p 8 8 2}{txt:  Gap warning - ordering allowed (1): mobility: missing indexed position}{p_end}
-{p 8 8 2}{txt:  Related/unverified - no action (5): eng: non-temporal meaning established;}
-{txt:  exercise: temporal meaning unverified; lab: non-temporal meaning established;}
-{txt:  mood: temporal meaning unverified; reading: non-temporal meaning established}{p_end}
-{p 8 8 2}{txt:  Ambiguous/conflicting - no action (5): focus: construct conflict;}
-{txt:  memory: metadata conflict; pain: normalized-key collision; score: construct conflict;}
-{txt:  survey: metadata conflict}{p_end}
-{p 8 8 2}{txt:  Proposed: 18 structures; 98 variables; maximum displacement 90 columns}{p_end}
 
-{p 8 8 2}{txt:If you want to proceed, please press Enter.}{p_end}
+{p 8 8 2}{txt:Examined: 100 variables}{p_end}
+{p 8 8 2}{txt:Confirmed temporal structures: 18}{p_end}
+{p 8 8 2}{txt:Variables to be reordered: 98}{p_end}
+{p 8 8 2}{txt:Maximum displacement: 90 columns}{p_end}
 
-{pstd}
-After the user reviews the one summary and presses Enter, the already frozen
-plan is applied once.  The command then prints only the following post-operation
-summary:{p_end}
+{p 8 8 2}{txt:Issues requiring review:}{p_end}
+{p 10 10 2}{txt:Gap warnings but ordering allowed (1): mobility}{p_end}
+{p 10 10 2}{txt:Related or unverified - no action (5): eng, exercise, lab, mood, reading}{p_end}
+{p 10 10 2}{txt:Ambiguous or conflicting - no action (5): focus, memory, pain, score, survey}{p_end}
 
-{p 8 8 2}{txt:varorder post-operation summary}{p_end}
-{p 8 8 2}{txt:  Updated: yes; examined 100; reorganized 18; moved 98;}
-{txt:  maximum displacement 90 columns}{p_end}
+{p 8 8 2}{txt:All eligible structures will be included in the proposed ordering.}
+{txt:Structures marked as no action will remain unchanged.}{p_end}
 
-{pstd}
-Ordinary confirmed structures are summarized by count and normalized family name.
-Only cases needing attention are explained.  Related or ambiguous structures
-are reported as {it:no action}, and no variable-by-variable position listing is
-printed.  The bounded display does not truncate the frozen full permutation.{p_end}
+{p 8 8 2}{txt: }{p_end}
+{p 8 8 2}{txt:Press Enter to apply the proposed ordering.}{p_end}
+
+{p 8 8 2}{txt:Variable order updated.}{p_end}
 
 
 {title:Example 2. Undo the most recent ordering}
