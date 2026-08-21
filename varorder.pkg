@@ -1,0 +1,12 @@
+v 3
+d VARORDER: Automatic semantic detection and temporal ordering of variables in wide-format datasets
+d
+d Distribution-Date: 20260821
+d Requires: Stata 16 or later
+d Author: Hao Ma
+d Email: shouhuoxiwang2027@gmail.com
+f varorder.ado
+f varorder.sthlp
+f varorder_example.do
+f varorder_test.do
+f varorder_example_data.dta
