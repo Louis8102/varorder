@@ -12,17 +12,7 @@
 {title:Description}
 
 {pstd}
-{cmd:varorder} automatically examines the current wide-format dataset, identifies
-variables that contain sufficiently clear temporal structure, and places eligible
-variables into a defensible temporal order.  Semantic information may come from
-variable names, variable labels, variable notes, or agreement across these
-sources.{p_end}
-
-{pstd}
-The command is designed to reduce the manual work required to locate scattered
-repeated-measure variables, determine their temporal sequence, and reorganize
-them safely.  When the available information is ambiguous or conflicting,
-{cmd:varorder} reports the issue rather than guessing.{p_end}
+This module automatically examines the current wide-format dataset, identifies variables with sufficiently clear temporal structure using semantic information from variable names, variable labels, variable notes, or agreement across these sources, and places eligible variables into a defensible temporal order. When the available information is ambiguous or conflicting, {cmd:varorder} reports the issue rather than guessing.{p_end}
 
 
 {title:Why use varorder?}
@@ -32,9 +22,9 @@ Stata's native {cmd:order} command is effective when the user already knows
 exactly which variables should move and where they should go.  In large
 wide-format datasets, however, the difficult part may be identifying which
 variables belong to the same repeated-measure structure and determining their
-correct temporal sequence.  {cmd:varorder} automates that detection step and
-then performs the corresponding variable ordering when the evidence is
-sufficiently clear.{p_end}
+correct temporal sequence.  {cmd:varorder} is designed to reduce the manual
+work required to locate scattered repeated-measure variables, determine their
+temporal sequence, and reorganize them safely.{p_end}
 
 
 {title:Key features}
@@ -50,20 +40,15 @@ sufficiently clear.{p_end}
 
 {title:Syntax}
 
-{p 4 22 2}{cmd:varorder}{space 3}automatically detects and orders all variables that meet the temporal-ordering requirements.{p_end}
-{p 4 22 2}{cmd:varorder, undo}{space 3}restores the variable order that existed immediately before the most recent successful {cmd:varorder} operation.{p_end}
+{p 4 22 2}{cmd:varorder}{p_end}
+{p 4 22 2}{cmd:varorder, undo}{p_end}
 
 
 {title:Practical applications}
 
-{title:Example 1. Preview, review, and apply}
+{title:Example 1. Use the module to automatically detect temporal families and order their variables in the provided example dataset}
 
-{pstd}
-The following transcript is from the supplied
-{cmd:varorder_example_data.dta}.  It is actual validated output from
-StataNow/MP 19.5; the counts are not illustrative placeholders.{p_end}
-
-{p 4 4 2}{cmd:. use "D:/varorder/varorder_example_data.dta", clear}{p_end}
+{p 4 4 2}{cmd:. use varorder_example_data.dta, clear}{p_end}
 {p 4 4 2}{cmd:. varorder}{p_end}
 
 {p 8 8 2}{txt:varorder preview summary}{p_end}
@@ -85,7 +70,7 @@ summary:{p_end}
 {p 8 8 2}{txt:  Updated: yes; examined 100; reorganized 18; moved 98; maximum displacement 90 columns}{p_end}
 
 {pstd}
-Ordinary confirmed structures are summarized by count and normalized stem.
+Ordinary confirmed structures are summarized by count and normalized family name.
 Only cases needing attention are explained.  Related or ambiguous structures
 are reported as {it:no action}, and no variable-by-variable position listing is
 printed.  The bounded display does not truncate the frozen full permutation.{p_end}
@@ -98,12 +83,6 @@ After a successful mutating {cmd:varorder}, restore the immediately preceding
 physical variable order with:{p_end}
 
 {p 4 4 2}{cmd:. varorder, undo}{p_end}
-
-{pstd}
-Undo is single-level.  A successful undo consumes the saved state.  A declined
-preview, a no-op, or a failed operation does not replace an existing valid undo
-state.  Undo refuses safely if the stored state does not belong to the current
-compatible dataset state.{p_end}
 
 
 {title:Stored results}
@@ -130,8 +109,7 @@ After {cmd:varorder}, the command stores the following in {cmd:r()}:{p_end}
 {title:Compatibility}
 
 {pstd}
-{cmd:varorder} requires Stata 16 or later.  This release was developed and
-validated with StataNow/MP 19.5.{p_end}
+{cmd:varorder} requires Stata 16 or later.{p_end}
 
 
 {title:Author}
@@ -156,4 +134,4 @@ Ma, H. (2026). {it:varorder: Automated semantic detection and temporal ordering 
 {title:License}
 
 {pstd}
-{cmd:varorder} is free software licensed under the GNU General Public License version 3 (GPL-3.0). A copy of the GNU General Public License version 3 should be distributed with the {cmd:varorder} package.{p_end}
+{cmd:varorder} is free software licensed under the GNU General Public License version 3 (GPL-3.0).{p_end}
