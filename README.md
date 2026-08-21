@@ -26,22 +26,33 @@ often finding scattered repeated-measure variables and reconstructing their
 temporal sequence. `varorder` performs that inference conservatively and applies
 only a complete, validated permutation.
 
-## Installation
+## Installation and example data
 
-Copy these two files to a directory on Stata's ado-path:
-
-```text
-varorder.ado
-varorder.sthlp
-```
-
-Use Stata's `sysdir` command to locate your PERSONAL ado directory, or add the
-release folder for the current session:
+Install the current release directly from GitHub:
 
 ```stata
-adopath ++ "path/to/varorder"
+net install varorder, from("https://raw.githubusercontent.com/Louis8102/varorder/main") replace
+```
+
+Retrieve the example dataset and the example and test do-files:
+
+```stata
+net get varorder, from("https://raw.githubusercontent.com/Louis8102/varorder/main") replace
+```
+
+Load the example dataset:
+
+```stata
+use varorder_example_data.dta, clear
+```
+
+Open the help file:
+
+```stata
 help varorder
 ```
+
+Project repository: [github.com/Louis8102/varorder](https://github.com/Louis8102/varorder)
 
 ## Practical example
 
