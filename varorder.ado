@@ -27,102 +27,69 @@ program define varorder, rclass
     local freasons `r(family_reasons)'
 
     local nf : word count `fams'
-    local conuniq ""
-    local reltext ""
-    local ambtext ""
-    local gaptext ""
-    local relshown 0
-    local ambshown 0
-    local gapshown 0
-    local ngap 0
+    local relnames ""
+    local ambnames ""
+    local gapnames ""
     forvalues i = 1/`nf' {
         local f : word `i' of `fams'
         local s : word `i' of `fstates'
         local q : word `i' of `freasons'
-        if "`s'" == "confirmed" {
-            local fp : list posof "`f'" in conuniq
-            if !`fp' local conuniq "`conuniq' `f'"
-            if "`q'" == "gap" {
-                local ++ngap
-                if `gapshown' < 8 {
-                    if "`gaptext'" == "" local gaptext "`f': missing indexed position"
-                    else local gaptext "`gaptext'; `f': missing indexed position"
-                    local ++gapshown
-                }
-            }
+        if "`s'" == "confirmed" & "`q'" == "gap" {
+            local fp : list posof "`f'" in gapnames
+            if !`fp' local gapnames "`gapnames' `f'"
         }
-        else {
-            local readable "`q'"
-            if "`q'" == "explicit_non_temporal" local readable "non-temporal meaning established"
-            else if "`q'" == "temporal_unverified" local readable "temporal meaning unverified"
-            else if "`q'" == "construct_conflict" local readable "construct conflict"
-            else if "`q'" == "position_conflict" local readable "temporal-position conflict"
-            else if "`q'" == "temporal_conflict" local readable "metadata conflict"
-            else if "`q'" == "normalized_key_collision" local readable "normalized-key collision"
-            else if "`q'" == "hierarchy_ambiguous" local readable "hierarchy ambiguous"
-            if "`s'" == "related" & `relshown' < 8 {
-                if "`reltext'" == "" local reltext "`f': `readable'"
-                else local reltext "`reltext'; `f': `readable'"
-                local ++relshown
-            }
-            else if "`s'" == "ambiguous" & `ambshown' < 8 {
-                if "`ambtext'" == "" local ambtext "`f': `readable'"
-                else local ambtext "`ambtext'; `f': `readable'"
-                local ++ambshown
-            }
+        else if "`s'" == "related" {
+            local fp : list posof "`f'" in relnames
+            if !`fp' local relnames "`relnames' `f'"
+        }
+        else if "`s'" == "ambiguous" {
+            local fp : list posof "`f'" in ambnames
+            if !`fp' local ambnames "`ambnames' `f'"
         }
     }
-    local conuniq : list retokenize conuniq
-    local nconstems : word count `conuniq'
-    local constemtext ""
-    local constemshown = min(`nconstems', 12)
-    if `constemshown' {
-        forvalues u = 1/`constemshown' {
-            local f : word `u' of `conuniq'
-            local fc 0
-            forvalues i = 1/`nf' {
-                local fi : word `i' of `fams'
-                local si : word `i' of `fstates'
-                if "`si'" == "confirmed" & "`fi'" == "`f'" local ++fc
+    local gapnames : list retokenize gapnames
+    local relnames : list retokenize relnames
+    local ambnames : list retokenize ambnames
+    local ngap : word count `gapnames'
+    local nrelissues : word count `relnames'
+    local nambissues : word count `ambnames'
+    foreach issue in gap rel amb {
+        local `issue'text ""
+        local ntotal 0
+        if "`issue'" == "gap" local ntotal = `ngap'
+        else if "`issue'" == "rel" local ntotal = `nrelissues'
+        else if "`issue'" == "amb" local ntotal = `nambissues'
+        local nshow = min(`ntotal', 8)
+        if `nshow' {
+            forvalues j = 1/`nshow' {
+                local f : word `j' of ``issue'names'
+                if "``issue'text'" == "" local `issue'text "`f'"
+                else local `issue'text "``issue'text', `f'"
             }
-            local flabel "`f'"
-            if `fc' > 1 local flabel "`f' (`fc')"
-            if "`constemtext'" == "" local constemtext "`flabel'"
-            else local constemtext "`constemtext', `flabel'"
         }
+        if `ntotal' > `nshow' local `issue'text "``issue'text', ..."
     }
-    if "`constemtext'" == "" local constemtext "none"
-    local constemmore = max(0, `nconstems' - `constemshown')
-    local relmore = max(0, `nfrel' - `relshown')
-    local ambmore = max(0, `nfamb' - `ambshown')
-    local gapmore = max(0, `ngap' - `gapshown')
 
     di as txt ""
     di as txt "varorder preview summary"
-    di as txt "  Examined: `k' variables; candidate structures: `nfdet'"
-    di as txt "  Confirmed: `nfcon'; stems: `constemtext'" _continue
-    if `constemmore' di as txt " (+`constemmore' stems omitted)"
-    else di as txt ""
-    if `ngap' {
-        di as txt "  Gap warning - ordering allowed (`ngap'): `gaptext'" _continue
-        if `gapmore' di as txt " (+`gapmore' omitted)"
-        else di as txt ""
+    di as txt ""
+    di as txt "Examined: `k' variables"
+    di as txt "Confirmed temporal structures: `nfcon'"
+    di as txt "Variables to be reordered: `nmove'"
+    di as txt "Maximum displacement: `maxdisp' columns"
+    if `ngap' | `nrelissues' | `nambissues' {
+        di as txt ""
+        di as txt "Issues requiring review:"
+        if `ngap' di as txt "  Gap warnings but ordering allowed (`ngap'): `gaptext'"
+        if `nrelissues' di as txt "  Related/unverified — no action (`nrelissues'): `reltext'"
+        if `nambissues' di as txt "  Ambiguous/conflicting — no action (`nambissues'): `ambtext'"
     }
-    if `nfrel' {
-        di as txt "  Related/unverified - no action (`nfrel'): `reltext'" _continue
-        if `relmore' di as txt " (+`relmore' omitted)"
-        else di as txt ""
-    }
-    if `nfamb' {
-        di as txt "  Ambiguous/conflicting - no action (`nfamb'): `ambtext'" _continue
-        if `ambmore' di as txt " (+`ambmore' omitted)"
-        else di as txt ""
-    }
-    di as txt "  Proposed: `nfchanged' structures; `nmove' variables; maximum displacement `maxdisp' columns"
+    di as txt ""
+    di as txt "All eligible structures will be included in the proposed ordering. Structures marked as no action will remain unchanged."
 
     if "`old'" == "`proposed'" {
-        di as result "varorder postview summary"
-        di as txt "  Updated: no; no variable-order changes were required."
+        di as txt ""
+        di as txt "No variable-order changes were required."
         _varorder_returns, oldorder(`"`old'"') neworder(`"`old'"') k(`k') changed(0) ///
             nfdet(`nfdet') nfcon(`nfcon') nfrel(`nfrel') nfamb(`nfamb') ///
             nfchanged(0) nfsup(`nfsup') nmove(0) maxdisp(0)
@@ -131,13 +98,13 @@ program define varorder, rclass
     }
 
     global VARORDER_CONFIRM_RESPONSE ""
-    display as txt "If you want to proceed, please press Enter." _request(VARORDER_CONFIRM_RESPONSE)
+    di as txt ""
+    display as txt "Press Enter to apply the proposed ordering." _request(VARORDER_CONFIRM_RESPONSE)
     local __vo_answer "${VARORDER_CONFIRM_RESPONSE}"
     macro drop VARORDER_CONFIRM_RESPONSE
     local __vo_confirmed = ("`__vo_answer'" == "" & lower(c(mode)) != "batch")
     if !`__vo_confirmed' {
-        di as result "varorder postview summary"
-        di as txt "  Updated: no; confirmation declined; dataset unchanged."
+        di as txt "Confirmation declined; dataset unchanged."
         _varorder_returns, oldorder(`"`old'"') neworder(`"`old'"') k(`k') changed(0) ///
             nfdet(`nfdet') nfcon(`nfcon') nfrel(`nfrel') nfamb(`nfamb') ///
             nfchanged(0) nfsup(`nfsup') nmove(0) maxdisp(0)
@@ -147,9 +114,7 @@ program define varorder, rclass
 
     _varorder_apply, neworder(`proposed') expectedold(`old')
     local changed = r(changed)
-    di as result ""
-    di as result "varorder postview summary"
-    di as txt "  Updated: yes; examined `k'; reorganized `nfchanged'; moved `nmove'; maximum displacement `maxdisp' columns"
+    if `changed' di as result "Variable order updated."
     _varorder_returns, oldorder(`"`old'"') neworder(`"`proposed'"') k(`k') changed(`changed') ///
         nfdet(`nfdet') nfcon(`nfcon') nfrel(`nfrel') nfamb(`nfamb') ///
         nfchanged(`nfchanged') nfsup(`nfsup') nmove(`nmove') maxdisp(`maxdisp')
