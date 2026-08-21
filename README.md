@@ -120,7 +120,7 @@ state counts, `r(n_moved)`, `r(max_displacement)`, and the complete
 
 ## Validation and reproducibility
 
-`varorder` requires Stata 16 or later. Version 1.0.1 was developed and validated
+`varorder` requires Stata 16 or later. Version 1.0.0 was developed and validated
 with:
 
 ```text
@@ -151,7 +151,7 @@ GitHub: [Louis8102](https://github.com/Louis8102/)
 ## Citation
 
 Ma, H. (2026). *varorder: Automated semantic detection and temporal ordering of
-variables in Stata*. Stata module, version 1.0.1.
+variables in Stata*. Stata module, version 1.0.0.
 
 Citation metadata are also provided in `CITATION.cff`.
 
