@@ -118,13 +118,10 @@ StataNow/MP 19.5
 ```
 
 The highest integrated width actually executed was 5,000 variables. No claim is
-made for end-to-end performance at 120,000 variables. The `tests/` directory
-contains portable fixture builders and executable Gate 3, Gate 4, Gate 6, and
-Gate 7 checks. The `validation/` directory contains the frozen example-data
-oracle and Gate 1–9 evidence summaries.
-
-From the repository root, follow `tests/README.md` to reproduce the public test
-suite. The production ado never reads a test oracle during inference.
+made for end-to-end performance at 120,000 variables. Run
+`varorder_example.do` for the supplied example workflow and
+`varorder_test.do` for the compact public acceptance checks. The production ado
+does not read either file during inference.
 
 ## Contribution boundary
 
