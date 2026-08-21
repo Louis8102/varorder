@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If you use varorder in your research, please cite it using the metadata below."
+title: "varorder: Automated semantic detection and temporal ordering of variables in Stata"
+type: software
+authors:
+  - family-names: Ma
+    given-names: Hao
+version: 1.0.0
+date-released: 2026-08-21
+license: GPL-3.0-only
+abstract: >-
+  A Stata module for metadata-aware, ambiguity-aware automatic detection and
+  safe temporal reorganization of variable families in wide-format datasets.
+
