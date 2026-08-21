@@ -157,4 +157,3 @@ Ma, H. (2026). {it:varorder: Automated semantic detection and temporal ordering 
 
 {pstd}
 {cmd:varorder} is free software licensed under the GNU General Public License version 3 (GPL-3.0). A copy of the GNU General Public License version 3 should be distributed with the {cmd:varorder} package.{p_end}
-
