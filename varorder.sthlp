@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 1.0.0 21aug2026}{...}
+{* *! version 1.0.1 21aug2026}{...}
 {vieweralsosee "order" "help order"}{...}
 {vieweralsosee "notes" "help notes"}{...}
 
@@ -150,7 +150,7 @@ If you use {cmd:varorder} in research, please cite the software.  Before an
 SSC/RePEc identifier is assigned, the suggested citation is:{p_end}
 
 {phang}
-Ma, H. (2026). {it:varorder: Automated semantic detection and temporal ordering of variables in Stata}. Stata module, version 1.0.0.{p_end}
+Ma, H. (2026). {it:varorder: Automated semantic detection and temporal ordering of variables in Stata}. Stata module, version 1.0.1.{p_end}
 
 
 {title:License}
