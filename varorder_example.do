@@ -35,4 +35,3 @@ return list
 
 * Restore the physical variable order that preceded the successful varorder.
 varorder, undo
-
