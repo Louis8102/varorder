@@ -1,4 +1,4 @@
-*! varorder 1.0.0 21aug2026
+*! varorder 1.0.1 21aug2026
 *! conservative automatic temporal ordering for wide-format data
 program define varorder, rclass
     version 16.0
@@ -131,7 +131,7 @@ program define varorder, rclass
     }
 
     global VARORDER_CONFIRM_RESPONSE ""
-    display _request(VARORDER_CONFIRM_RESPONSE) "If you want to proceed, please press Enter."
+    display as txt "If you want to proceed, please press Enter." _request(VARORDER_CONFIRM_RESPONSE)
     local __vo_answer "${VARORDER_CONFIRM_RESPONSE}"
     macro drop VARORDER_CONFIRM_RESPONSE
     local __vo_confirmed = ("`__vo_answer'" == "" & lower(c(mode)) != "batch")
