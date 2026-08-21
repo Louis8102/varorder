@@ -276,4 +276,3 @@ local final_fail = TV_fail
 log close
 if `final_fail' > 0 exit 9
 exit, clear
-
