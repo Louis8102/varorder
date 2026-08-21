@@ -623,4 +623,3 @@ void _varorder_extra_identity(string scalar canonical)
     st_local("__vo_extra_identity",strofreal(hash1(parts'),"%21x"))
 }
 end
-
