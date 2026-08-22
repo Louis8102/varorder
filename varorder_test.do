@@ -18,6 +18,7 @@ version 16.0
 args release_dir
 clear all
 set more off
+set linesize 255
 capture log close
 
 if `"`release_dir'"' == "" local release_dir `"`c(pwd)'"'
@@ -119,13 +120,13 @@ local previous_line ""
 file read tvp line
 while r(eof) == 0 {
     if strtrim(`"`line'"') == "varorder preview summary" local ++preview_headers
-    if strtrim(`"`line'"') == "Examined: 100 variables" local ++examined_lines
-    if strtrim(`"`line'"') == "Confirmed temporal structures: 18" local ++confirmed_lines
-    if strtrim(`"`line'"') == "Variables to be reordered: 98" local ++reordered_lines
+    if strtrim(`"`line'"') == "Examined: 106 variables" local ++examined_lines
+    if strtrim(`"`line'"') == "Confirmed temporal structures: 19" local ++confirmed_lines
+    if strtrim(`"`line'"') == "Variables to be reordered: 101" local ++reordered_lines
     if strtrim(`"`line'"') == "Maximum displacement: 90 columns" local ++displacement_lines
     if strtrim(`"`line'"') == "Issues requiring review:" local ++issue_headers
     if strpos(`"`line'"', "Gap warnings but ordering allowed (1): mobility") local ++gap_lines
-    if strpos(`"`line'"', "Related/unverified") & strpos(`"`line'"', "(5): eng, exercise, lab, mood, reading") local ++related_lines
+    if strpos(`"`line'"', "Related/unverified") & strpos(`"`line'"', "(6): eng, exercise, lab, mood, promotion_status, reading") local ++related_lines
     if strpos(`"`line'"', "Ambiguous/conflicting") & strpos(`"`line'"', "(5): focus, memory, pain, score, survey") local ++ambiguous_lines
     if strpos(`"`line'"', "All eligible structures will be included in the proposed ordering.") local ++decision_lines
     if strpos(`"`line'"', "Press Enter to apply the proposed ordering.") {

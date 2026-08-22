@@ -128,6 +128,7 @@ program define _varorder_plan, rclass
     forvalues __vo_i = 1/`__vo_k' {
         local __vo_v : word `__vo_i' of `__vo_old'
         local __vo_lab`__vo_i' : variable label `__vo_v'
+        local __vo_vlname`__vo_i' : value label `__vo_v'
         notes _count __vo_nn : `__vo_v'
         local __vo_note`__vo_i' ""
         if `__vo_nn' > 0 {
@@ -302,7 +303,7 @@ end
 mata:
 struct vo_parse {
     string scalar family, system, key, reason
-    real scalar temporal, negative, ambiguous
+    real scalar temporal, negative, ambiguous, unresolved
     real rowvector kval
 }
 
@@ -322,23 +323,79 @@ real scalar _vo_has(string scalar s, string scalar re)
     return(ustrregexm(" "+s+" ", re))
 }
 
-string scalar _vo_clean_family(string scalar s)
+string scalar _vo_clean_family(string scalar s, real scalar stage)
 {
     string rowvector t, keep
-    real scalar i,oka,okb
+    real scalar i,stagecontext
+    stagecontext = stage & ustrregexm(" "+s+" ", " (before|during|after|pre|mid|post) (treatment|intervention|therapy|program) ")
     t = tokens(s); keep = J(1,0,"")
     for (i=1; i<=cols(t); i++) {
         if (anyof(("a","id","score","scores","measure","measures","measurement","measurements","repeated","assessment","assessments","outcome","outcomes","calendar","year","quarter","grade","academic","term","developmental","within","day","period","then","in","of","for","hierarchy","related","setting","context","location","home","school","community","work","commute","indoor","outdoor","time","wave","visit","t","q","g","questionnaire","item","form","batch","identifier","not","temporal"), t[i])) continue
+        if (stage & anyof(("pre","mid","post","pretest","posttest","baseline","followup","follow","up","before","during","after","at","position","unknown","unspecified","occasion","phase"),t[i])) continue
+        if (stagecontext & anyof(("treatment","intervention","therapy","program"),t[i])) continue
         if (ustrregexm(t[i], "^[0-9]+$")) continue
-        if (anyof(("pre","mid","post","pretest","posttest","baseline","followup","fall","spring","morning","afternoon","evening"),t[i])) continue
+        if (anyof(("fall","spring","morning","afternoon","evening"),t[i])) continue
         keep = keep,t[i]
     }
     if (cols(keep)==0) {
         if (_vo_has(s," score ")) return("score")
         return("")
     }
-    if (cols(keep)==1 & strlen(keep[1])==1) return("")
+    if (cols(keep)==1 & ustrlen(keep[1])==1) return("")
     return(invtokens(keep))
+}
+
+real scalar _vo_generic_value_token(string scalar s)
+{
+    return(anyof(("yes","no","yesno","true","false","binary","agree","agreed","disagree","disagreed","strongly","neither","nor","neutral","not","applicable","unknown","missing","refused","dont","know","never","rarely","sometimes","often","always","low","medium","high","very","poor","fair","good","excellent","satisfied","dissatisfied","other","none","pre","mid","post","before","during","after","baseline","followup","follow","up"),s))
+}
+
+string scalar _vo_clean_value_name(string scalar raw)
+{
+    string rowvector t, keep
+    real scalar i
+    string scalar compact
+    t=tokens(_vo_norm(raw)); keep=J(1,0,"")
+    for(i=1;i<=cols(t);i++) {
+        if(anyof(("value","values","label","labels","lbl","vl","domain","code","codes","generic","answer","answers","response","responses","category","categories","phase"),t[i])) continue
+        if(ustrregexm(t[i],"^[0-9]+$")) continue
+        keep=keep,t[i]
+    }
+    if(cols(keep)==0) return("")
+    if(cols(keep)==1 & ustrlen(keep[1])==1) return("")
+    compact=subinstr(invtokens(keep)," ","",.)
+    if(anyof(("yesno","binary","likert","status"),compact)) return("")
+    return(invtokens(keep))
+}
+
+string rowvector _vo_value_info(string scalar labelname)
+{
+    string scalar fam, sig, one
+    string rowvector dirs, nt, toks, distinctive
+    string colvector txt
+    real colvector val
+    real scalar i,j
+    fam=""; sig=""; distinctive=J(1,0,"")
+    if(labelname=="") return((fam,sig,"0"))
+    fam=_vo_clean_value_name(labelname)
+    dirs=vec(st_vldir())'
+    if(anyof(dirs,labelname)) {
+        st_vlload(labelname,val,txt)
+        nt=J(1,rows(txt),"")
+        for(i=1;i<=rows(txt);i++) nt[i]=_vo_norm(txt[i])
+        nt=uniqrows(sort(nt',1))'
+        sig=invtokens(nt,"|")
+        for(i=1;i<=cols(nt);i++) {
+            toks=tokens(nt[i])
+            for(j=1;j<=cols(toks);j++) {
+                if(ustrregexm(toks[j],"^[0-9]+$") | _vo_generic_value_token(toks[j])) continue
+                if(!anyof(distinctive,toks[j])) distinctive=distinctive,toks[j]
+            }
+        }
+    }
+    if(fam=="" & cols(distinctive)) fam=invtokens(sort(distinctive',1)')
+    if(fam=="") return(("",sig,"0"))
+    return((fam,sig,"1"))
 }
 
 struct vo_parse scalar _vo_parse_source(string scalar raw)
@@ -346,22 +403,27 @@ struct vo_parse scalar _vo_parse_source(string scalar raw)
     struct vo_parse scalar p
     string scalar s, fam, m
     real scalar n, q, g, d, per, yr
-    p.family=""; p.system=""; p.key="."; p.reason=""; p.temporal=0; p.negative=0; p.ambiguous=0; p.kval=J(1,0,.)
+    p.family=""; p.system=""; p.key="."; p.reason=""; p.temporal=0; p.negative=0; p.ambiguous=0; p.unresolved=0; p.kval=J(1,0,.)
     s = _vo_norm(raw)
     if (s=="") return(p)
     p.negative = _vo_has(s, " (not time|not temporal|questionnaire item|assessment form|batch identifier|batch id) ")
+    p.unresolved = ustrregexm(" "+s+" ", " (temporal position|time point|measurement occasion) (unknown|unspecified) ")
 
     if (ustrregexm(" "+s+" ", " (t|time|wave|visit) 0*([1-9][0-9]*) ")) {
         m=ustrregexs(1); n=strtoreal(ustrregexs(2)); p.temporal=1; p.system=m; p.kval=n; p.key=strofreal(n)
     }
-    else if (_vo_has(s," pretest ")) { p.temporal=1; p.system="pretest"; p.kval=1; p.key="1"; }
-    else if (_vo_has(s," posttest ")) { p.temporal=1; p.system="pretest"; p.kval=2; p.key="2"; }
-    else if (_vo_has(s," baseline ")) { p.temporal=1; p.system="followup"; p.kval=1; p.key="1"; }
-    else if (ustrregexm(" "+s+" ", " followup 0*([1-9][0-9]*) ")) { n=strtoreal(ustrregexs(1)); p.temporal=1; p.system="followup"; p.kval=n+1; p.key=strofreal(n+1); }
-    else if (_vo_has(s," followup ")) { p.temporal=1; p.system="followup"; p.kval=2; p.key="2"; }
-    else if (_vo_has(s," pre ")) { p.temporal=1; p.system="prepost"; p.kval=1; p.key="1"; }
-    else if (_vo_has(s," mid ")) { p.temporal=1; p.system="prepost"; p.kval=2; p.key="2"; }
-    else if (_vo_has(s," post ")) { p.temporal=1; p.system="prepost"; p.kval=3; p.key="3"; }
+    else if (_vo_has(s," pretest ")) { p.temporal=1; p.system="stage"; p.kval=(1,0); p.key="1:0"; }
+    else if (_vo_has(s," posttest ")) { p.temporal=1; p.system="stage"; p.kval=(3,0); p.key="3:0"; }
+    else if (_vo_has(s," baseline ")) { p.temporal=1; p.system="stage"; p.kval=(1,0); p.key="1:0"; }
+    else if (ustrregexm(" "+s+" ", " follow up 0*([1-9][0-9]*) ")) { n=strtoreal(ustrregexs(1)); p.temporal=1; p.system="stage"; p.kval=(3,n); p.key="3:"+strofreal(n); }
+    else if (ustrregexm(" "+s+" ", " followup 0*([1-9][0-9]*) ")) { n=strtoreal(ustrregexs(1)); p.temporal=1; p.system="stage"; p.kval=(3,n); p.key="3:"+strofreal(n); }
+    else if (_vo_has(s," follow up ") | _vo_has(s," followup ")) { p.temporal=1; p.system="stage"; p.kval=(3,1); p.key="3:1"; }
+    else if (_vo_has(s," pre ")) { p.temporal=1; p.system="stage"; p.kval=(1,0); p.key="1:0"; }
+    else if (_vo_has(s," mid ")) { p.temporal=1; p.system="stage"; p.kval=(2,0); p.key="2:0"; }
+    else if (_vo_has(s," post ")) { p.temporal=1; p.system="stage"; p.kval=(3,0); p.key="3:0"; }
+    else if (_vo_has(s," before ")) { p.temporal=1; p.system="stage"; p.kval=(1,0); p.key="1:0"; }
+    else if (_vo_has(s," during ")) { p.temporal=1; p.system="stage"; p.kval=(2,0); p.key="2:0"; }
+    else if (_vo_has(s," after ")) { p.temporal=1; p.system="stage"; p.kval=(3,0); p.key="3:0"; }
 
     if (ustrregexm(" "+s+" ", " ([12][0-9][0-9][0-9]) q 0*([1-4]) ")) {
         yr=strtoreal(ustrregexs(1)); q=strtoreal(ustrregexs(2)); p.temporal=1; p.system="year_quarter"; p.kval=(yr,q); p.key=strofreal(yr)+":"+strofreal(q)
@@ -387,7 +449,8 @@ struct vo_parse scalar _vo_parse_source(string scalar raw)
     if (!p.temporal & ustrregexm(" "+s+" ", " ([0-9]+) ([0-9]+) ")) {
         p.ambiguous=1; p.system="unknown_hierarchy"; p.key=ustrregexs(1)+":"+ustrregexs(2); p.kval=(strtoreal(ustrregexs(1)),strtoreal(ustrregexs(2)))
     }
-    fam=_vo_clean_family(s)
+    if (!p.temporal & ustrregexm(" "+s+" ", " (phase|measurement occasion|time point) ")) p.unresolved=1
+    fam=_vo_clean_family(s, (p.system=="stage" | p.unresolved))
     if (fam=="" & ustrregexm(s,"^([[:alpha:]]+) [0-9]+$")) fam=ustrregexs(1)
     if (!p.temporal & !p.ambiguous & ustrregexm(s,"^(.+) q 0*([1-4])$")) { p.key=strofreal(strtoreal(ustrregexs(2))); p.system="quarter_candidate"; }
     else if (!p.temporal & !p.ambiguous & ustrregexm(s,"^(.+) ([0-9]+)$")) { p.key=strofreal(strtoreal(ustrregexs(2))); p.system="bare_numeric"; }
@@ -404,24 +467,24 @@ real scalar _vo_compatible(string scalar a, string scalar b)
     if (a=="" | b=="") return(1)
     if (a==b) return(1)
     if (subinstr(a," ","")==subinstr(b," ","")) return(1)
-    if (min((strlen(a),strlen(b)))>=3 & (substr(a,1,strlen(b))==b | substr(b,1,strlen(a))==a)) return(1)
+    if (min((ustrlen(a),ustrlen(b)))>=3 & (usubstr(a,1,ustrlen(b))==b | usubstr(b,1,ustrlen(a))==a)) return(1)
     ta=tokens(a); tb=tokens(b); ia=ib=""
-    if(min((strlen(ta[1]),strlen(tb[1])))>=3 & (substr(ta[1],1,strlen(tb[1]))==tb[1] | substr(tb[1],1,strlen(ta[1]))==ta[1])) {
+    if(min((ustrlen(ta[1]),ustrlen(tb[1])))>=3 & (usubstr(ta[1],1,ustrlen(tb[1]))==tb[1] | usubstr(tb[1],1,ustrlen(ta[1]))==ta[1])) {
         oka=(cols(ta)==1); okb=(cols(tb)==1)
         if(cols(ta)>1) oka=all((ta[|2\cols(ta)|]:=="at") :| (ta[|2\cols(ta)|]:=="by"))
         if(cols(tb)>1) okb=all((tb[|2\cols(tb)|]:=="at") :| (tb[|2\cols(tb)|]:=="by"))
         if(oka & okb) return(1)
     }
-    for(i=1;i<=cols(ta);i++) ia=ia+substr(ta[i],1,1)
-    for(i=1;i<=cols(tb);i++) ib=ib+substr(tb[i],1,1)
-    if ((strlen(a)>=2 & a==ib) | (strlen(b)>=2 & b==ia)) return(1)
+    for(i=1;i<=cols(ta);i++) ia=ia+usubstr(ta[i],1,1)
+    for(i=1;i<=cols(tb);i++) ib=ib+usubstr(tb[i],1,1)
+    if ((ustrlen(a)>=2 & a==ib) | (ustrlen(b)>=2 & b==ia)) return(1)
     return(strpos(" "+a+" "," "+b+" ")>0 | strpos(" "+b+" "," "+a+" ")>0)
 }
 
 string scalar _vo_schema(string scalar s)
 {
     if (anyof(("t","time","wave","visit"),s)) return("index")
-    if (anyof(("prepost","pretest"),s)) return("stage")
+    if (anyof(("stage","stage_unresolved"),s)) return("stage")
     if (s=="quarter_candidate") return("quarter")
     if (s=="bare_numeric" | s=="related_lexical" | s=="") return("related")
     return(s)
@@ -438,33 +501,40 @@ string scalar _vo_sort_key(real rowvector v)
 
 void _varorder_make_plan()
 {
-    real scalar k,i,j,g,nf,conf,neg,amb,alltemp,collision,gap,pos,newpos,maxd,nmove,nfchanged
-    string rowvector vn,fam,grp,state,key,reason,sys,skey,allf,fs,fr,neworder
-    real rowvector kval, anchors, ord, members, emitted, classix, idx, gx
+    real scalar k,i,j,g,nf,conf,neg,amb,unres,alltemp,collision,gap,pos,newpos,maxd,nmove,nfchanged,linkok
+    string scalar canon
+    string colvector choices
+    string rowvector vn,fam,grp,state,key,reason,sys,skey,allf,fs,fr,neworder,vfamily,vdom,vi
+    real rowvector kval, anchors, ord, members, emitted, classix, idx, gx,vinfo,matches
     struct vo_parse scalar pn,pl,pt
-    k=st_nvar(); vn=J(1,k,""); fam=state=key=reason=sys=skey=J(1,k,""); kval=J(1,k,.)
+    k=st_nvar(); vn=J(1,k,""); fam=state=key=reason=sys=skey=vfamily=vdom=J(1,k,""); kval=J(1,k,.); vinfo=J(1,k,0)
     for (i=1;i<=k;i++) {
         vn[i]=st_varname(i)
         pn=_vo_parse_source(vn[i]); pl=_vo_parse_source(st_local("__vo_lab"+strofreal(i))); pt=_vo_parse_source(st_local("__vo_note"+strofreal(i)))
+        vi=_vo_value_info(st_local("__vo_vlname"+strofreal(i))); vfamily[i]=vi[1]; vdom[i]=vi[2]; vinfo[i]=strtoreal(vi[3])
         if(ustrregexm(vn[i],"[[:alpha:]][12][0-9][0-9][0-9]")) { pn.temporal=0; pn.key="."; pn.system=""; pn.kval=J(1,0,.); }
-        if (ustrregexm(_vo_norm(vn[i]),"^(v|var|x|item|q) [0-9]+$")) pn.family=""
-        if (strlen(pn.family)<2) pn.family=""
-        if (strlen(pl.family)<2) pl.family=""
-        if (strlen(pt.family)<2) pt.family=""
+        if (ustrregexm(_vo_norm(vn[i]),"^(v|var|x|item|q|u) [0-9]+$")) {
+            pn.family=""
+            if (pn.system=="bare_numeric" | pn.system=="quarter_candidate") { pn.key="."; pn.system=""; pn.kval=J(1,0,.); }
+        }
+        if (ustrlen(pn.family)<2) pn.family=""
+        if (ustrlen(pl.family)<2) pl.family=""
+        if (ustrlen(pt.family)<2) pt.family=""
         if (pn.system=="grade_term" & !(_vo_has(_vo_norm(st_local("__vo_lab"+strofreal(i)))," (grade|developmental|academic term) ") | _vo_has(_vo_norm(st_local("__vo_note"+strofreal(i)))," (grade|developmental|academic term) "))) { pn.temporal=0; pn.key="."; pn.kval=J(1,0,.); }
         if (pn.system=="day_period" & !(strpos(_vo_norm(st_local("__vo_lab"+strofreal(i))),"within day") | strpos(_vo_norm(st_local("__vo_note"+strofreal(i))),"within day"))) { pn.temporal=0; pn.key="."; pn.kval=J(1,0,.); }
         conf=0
         if (!_vo_compatible(pn.family,pl.family) | !_vo_compatible(pn.family,pt.family) | !_vo_compatible(pl.family,pt.family)) { conf=1; reason[i]="construct_conflict"; }
-        if (pn.temporal & pl.temporal & (pn.key!=pl.key | (pn.system!=pl.system & !(anyof(("t","time","wave","visit"),pn.system) & anyof(("t","time","wave","visit"),pl.system))))) { conf=1; reason[i]="position_conflict"; }
-        if (pn.temporal & pt.temporal & pn.key!=pt.key) { conf=1; reason[i]="position_conflict"; }
-        if (pl.temporal & pt.temporal & pl.key!=pt.key) { conf=1; reason[i]="position_conflict"; }
+        if (pn.temporal & pl.temporal & (pn.key!=pl.key | _vo_schema(pn.system)!=_vo_schema(pl.system))) { conf=1; reason[i]="position_conflict"; }
+        if (pn.temporal & pt.temporal & (pn.key!=pt.key | _vo_schema(pn.system)!=_vo_schema(pt.system))) { conf=1; reason[i]="position_conflict"; }
+        if (pl.temporal & pt.temporal & (pl.key!=pt.key | _vo_schema(pl.system)!=_vo_schema(pt.system))) { conf=1; reason[i]="position_conflict"; }
         if ((pn.negative|pl.negative|pt.negative) & (pn.temporal|pl.temporal|pt.temporal)) { conf=1; reason[i]="temporal_conflict"; }
-        if (!pn.temporal & pl.family!="" & _vo_compatible(pn.family,pl.family)) fam[i]=(pn.family=="" | strlen(pl.family)<=strlen(pn.family) ? pl.family : pn.family)
+        if (!pn.temporal & pl.family!="" & _vo_compatible(pn.family,pl.family)) fam[i]=(pn.family=="" | ustrlen(pl.family)<=ustrlen(pn.family) ? pl.family : pn.family)
         else if (pn.family!="") fam[i]=pn.family
         else if (pl.family!="") fam[i]=pl.family
         else fam[i]=pt.family
-        if (pl.family!="" & subinstr(fam[i]," ","")==subinstr(pl.family," ","") & strlen(pl.family)<strlen(fam[i])) fam[i]=pl.family
-        if (pt.family!="" & subinstr(fam[i]," ","")==subinstr(pt.family," ","") & strlen(pt.family)<strlen(fam[i])) fam[i]=pt.family
+        if (pl.family!="" & subinstr(fam[i]," ","")==subinstr(pl.family," ","") & ustrlen(pl.family)<ustrlen(fam[i])) fam[i]=pl.family
+        if (pt.family!="" & subinstr(fam[i]," ","")==subinstr(pt.family," ","") & ustrlen(pt.family)<ustrlen(fam[i])) fam[i]=pt.family
+        if (fam[i]=="" & vinfo[i]) fam[i]=vfamily[i]
         if (pn.temporal) { key[i]=pn.key; sys[i]=pn.system; kval[i]=pn.kval[1]; skey[i]=_vo_sort_key(pn.kval); }
         else if (pl.temporal) { key[i]=pl.key; sys[i]=pl.system; kval[i]=pl.kval[1]; skey[i]=_vo_sort_key(pl.kval); }
         else if (pt.temporal) { key[i]=pt.key; sys[i]=pt.system; kval[i]=pt.kval[1]; skey[i]=_vo_sort_key(pt.kval); }
@@ -473,11 +543,30 @@ void _varorder_make_plan()
             if(pl.temporal) { key[i]=pl.key; sys[i]=pl.system; kval[i]=pl.kval[1]; skey[i]=_vo_sort_key(pl.kval); }
             else { key[i]=pt.key; sys[i]=pt.system; kval[i]=pt.kval[1]; skey[i]=_vo_sort_key(pt.kval); }
         }
+        if (!pn.temporal & !pl.temporal & !pt.temporal & (pn.unresolved|pl.unresolved|pt.unresolved)) sys[i]="stage_unresolved"
         if(ustrregexm(_vo_norm(vn[i]),"^item [0-9]+$") & sys[i]=="time" & fam[i]!="") fam[i]=fam[i]+" time"
         if (!pn.temporal & !pl.temporal & !pt.temporal & strpos(_vo_norm(st_local("__vo_lab"+strofreal(i))),"repeated measure") & ustrregexm(_vo_norm(vn[i])," ([[:alpha:]]+)$")) { key[i]=ustrregexs(1); sys[i]="related_lexical"; skey[i]=key[i]; }
         if (!conf) {
             if (pn.ambiguous|pl.ambiguous|pt.ambiguous) reason[i]="hierarchy_ambiguous"
+            else if (pn.unresolved|pl.unresolved|pt.unresolved) reason[i]="temporal_unresolved"
             else if (pn.negative|pl.negative|pt.negative) reason[i]="explicit_non_temporal"
+        }
+    }
+    for(i=1;i<=k;i++) if(reason[i]=="temporal_unresolved" & fam[i]!="") {
+        matches=J(1,0,.)
+        for(j=1;j<=k;j++) if(fam[j]!="" & key[j]!="" & _vo_schema(sys[j])=="stage" & _vo_compatible(fam[i],fam[j])) matches=matches,j
+        if(cols(matches)) {
+            linkok=1
+            for(g=1;g<cols(matches);g++) for(j=g+1;j<=cols(matches);j++) if(!_vo_compatible(fam[matches[g]],fam[matches[j]])) linkok=0
+            if(linkok) {
+                choices=uniqrows(sort(fam[matches]',1)); canon=choices[1]
+                for(j=2;j<=rows(choices);j++) if(ustrlen(choices[j])<ustrlen(canon)) canon=choices[j]
+                fam[i]=canon
+            }
+            else {
+                reason[i]="construct_conflict"
+                for(j=1;j<=cols(matches);j++) reason[matches[j]]="construct_conflict"
+            }
         }
     }
     grp=fam
@@ -491,7 +580,7 @@ void _varorder_make_plan()
     for (g=1;g<=cols(allf);g++) {
         members=select(1..k,grp:==allf[g]); anchors[g]=min(members)
         if (cols(members)<2) { fs[g]="unrelated"; continue; }
-        conf=anyof(reason[members],"construct_conflict") | anyof(reason[members],"position_conflict") | anyof(reason[members],"temporal_conflict"); neg=anyof(reason[members],"explicit_non_temporal"); amb=anyof(reason[members],"hierarchy_ambiguous")
+        conf=anyof(reason[members],"construct_conflict") | anyof(reason[members],"position_conflict") | anyof(reason[members],"temporal_conflict"); neg=anyof(reason[members],"explicit_non_temporal"); amb=anyof(reason[members],"hierarchy_ambiguous"); unres=anyof(reason[members],"temporal_unresolved")
         alltemp=all(key[members]:!="") & all(sys[members]:!="bare_numeric") & all(sys[members]:!="related_lexical")
         if(anyof(sys[members],"quarter_candidate")) alltemp=all((sys[members]:=="quarter") :| (sys[members]:=="quarter_candidate")) & anyof(sys[members],"quarter")
         collision=0
@@ -502,6 +591,7 @@ void _varorder_make_plan()
             else if(anyof(reason[members],"position_conflict")) fr[g]="position_conflict"
             else fr[g]="temporal_conflict"
         }
+        else if(unres) { fs[g]="ambiguous"; fr[g]="incomplete_temporal_structure"; }
         else if(amb) { fs[g]="ambiguous"; fr[g]="hierarchy_ambiguous"; }
         else if(collision) { fs[g]="ambiguous"; fr[g]="normalized_key_collision"; }
         else if(neg | !alltemp) { fs[g]="related"; fr[g]=(neg ? "explicit_non_temporal" : "temporal_unverified"); }

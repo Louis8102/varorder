@@ -7,7 +7,7 @@
 
 {phang}
 {bf:varorder} {hline 2} Automated detection of temporal structure and ordering of variables
-using semantic information in variable names, labels, and variable notes{p_end}
+using semantic information in variable names, labels, variable notes, and attached value labels{p_end}
 
 
 {title:Description}
@@ -15,7 +15,7 @@ using semantic information in variable names, labels, and variable notes{p_end}
 {pstd}
 This module automatically examines the current wide-format dataset, identifies variables with
 sufficiently clear temporal structure using semantic information from variable names, variable
-labels, variable notes, or agreement across these sources, and places eligible variables into a
+labels, variable notes, attached value-label metadata, or agreement across these sources, and places eligible variables into a
 defensible temporal order. When the available information is ambiguous or conflicting,
 {cmd:varorder} reports the issue rather than guessing.{p_end}
 
@@ -34,22 +34,24 @@ temporal sequence, and reorganize them safely.{p_end}
 
 {title:Key features}
 
-{p 4 6 2}• {bf:Semantic detection from three metadata sources.} {cmd:varorder} uses semantic
-information in variable names, variable labels, and variable notes to identify variables that
-belong together and determine whether they contain a defensible temporal structure. Evidence may
-come from one source or from agreement across multiple sources.{p_end}
+{p 4 6 2}• {bf:Semantic detection from four sources.} {cmd:varorder} uses semantic
+information in variable names, variable labels, variable notes, and attached value-label metadata
+to identify variables that belong together and determine whether they contain a defensible
+temporal structure. Value labels provide value-domain evidence; their category text is not treated
+as a variable's measurement occasion.{p_end}
 
 {p 4 6 2}• {bf:Temporal and hierarchical ordering.} The command recognizes high-confidence
 temporal patterns such as {cmd:T1/T2/T3}, {cmd:Wave 1/2/3}, {cmd:Visit 1/2/3}, explicit calendar
-years, and sequences such as {cmd:pre < mid < post}. When multiple ordered temporal components are
+years, and sequences such as {cmd:pre < mid < post} and
+{cmd:baseline < during treatment < follow-up}. When multiple ordered temporal components are
 supported by the semantic information, {cmd:varorder} can use hierarchical keys such as
 {cmd:year > quarter}, {cmd:grade > term}, or {cmd:day > within-day period}. Bare numeric suffixes are
 not treated as temporal unless the available semantics support that interpretation.{p_end}
 
-{p 4 6 2}• {bf:Metadata normalization across names, labels, and notes.} Formatting inconsistencies
+{p 4 6 2}• {bf:Metadata normalization across semantic sources.} Formatting inconsistencies
 such as capitalization, separators, compact forms, and leading zeros may occur in any metadata
 source. {cmd:varorder} normalizes such differences internally for detection while preserving the
-original variable names, labels, and notes and retaining each source separately so that agreement
+original variable names, labels, notes, and attached value labels and retaining each source separately so that agreement
 and conflict remain detectable.{p_end}
 
 {p 4 6 2}• {bf:Dataset safety.} {cmd:varorder} acts only when temporal evidence is sufficiently
@@ -74,14 +76,14 @@ plan, asks for at most one confirmation, and changes only the physical order of 
 
 {p 8 8 2}{txt:varorder preview summary}{p_end}
 
-{p 8 8 2}{txt:Examined: 100 variables}{p_end}
-{p 8 8 2}{txt:Confirmed temporal structures: 18}{p_end}
-{p 8 8 2}{txt:Variables to be reordered: 98}{p_end}
+{p 8 8 2}{txt:Examined: 106 variables}{p_end}
+{p 8 8 2}{txt:Confirmed temporal structures: 19}{p_end}
+{p 8 8 2}{txt:Variables to be reordered: 101}{p_end}
 {p 8 8 2}{txt:Maximum displacement: 90 columns}{p_end}
 
 {p 8 8 2}{txt:Issues requiring review:}{p_end}
 {p 10 10 2}{txt:Gap warnings but ordering allowed (1): mobility}{p_end}
-{p 10 10 2}{txt:Related or unverified - no action (5): eng, exercise, lab, mood, reading}{p_end}
+{p 10 10 2}{txt:Related or unverified - no action (6): eng, exercise, lab, mood, promotion_status, reading}{p_end}
 {p 10 10 2}{txt:Ambiguous or conflicting - no action (5): focus, memory, pain, score, survey}{p_end}
 
 {p 8 8 2}{txt:All eligible structures will be included in the proposed ordering.}
