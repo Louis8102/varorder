@@ -1,4 +1,4 @@
-*! varorder 1.1.0 22aug2026
+*! varorder 1.1.0 23aug2026
 program define varorder, rclass
     version 16.0
     syntax [, UNDO]
@@ -24,6 +24,12 @@ program define varorder, rclass
     local fams `r(family_names)'
     local fstates `r(family_states)'
     local freasons `r(family_reasons)'
+    local families_detected `"`r(families_detected)'"'
+    local families_confirmed `"`r(families_confirmed)'"'
+    local families_related `"`r(families_related)'"'
+    local families_ambiguous `"`r(families_ambiguous)'"'
+    local families_changed `"`r(families_changed)'"'
+    local families_suppressed `"`r(families_suppressed)'"'
 
     local nf : word count `fams'
     local relnames ""
@@ -89,9 +95,12 @@ program define varorder, rclass
     if "`old'" == "`proposed'" {
         di as txt ""
         di as txt "No variable-order changes were required."
-        _varorder_returns, oldorder(`"`old'"') neworder(`"`old'"') k(`k') changed(0) ///
+        _varorder_returns, oldorder(`old') neworder(`old') k(`k') changed(0) ///
             nfdet(`nfdet') nfcon(`nfcon') nfrel(`nfrel') nfamb(`nfamb') ///
-            nfchanged(0) nfsup(`nfsup') nmove(0) maxdisp(0)
+            nfchanged(0) nfsup(`nfsup') nmove(0) maxdisp(0) ///
+            fdet(`"`families_detected'"') fcon(`"`families_confirmed'"') ///
+            frel(`"`families_related'"') famb(`"`families_ambiguous'"') ///
+            fsup(`"`families_suppressed'"')
         return add
         exit
     }
@@ -104,9 +113,12 @@ program define varorder, rclass
     local __vo_confirmed = ("`__vo_answer'" == "" & lower(c(mode)) != "batch")
     if !`__vo_confirmed' {
         di as txt "Confirmation declined; dataset unchanged."
-        _varorder_returns, oldorder(`"`old'"') neworder(`"`old'"') k(`k') changed(0) ///
+        _varorder_returns, oldorder(`old') neworder(`old') k(`k') changed(0) ///
             nfdet(`nfdet') nfcon(`nfcon') nfrel(`nfrel') nfamb(`nfamb') ///
-            nfchanged(0) nfsup(`nfsup') nmove(0) maxdisp(0)
+            nfchanged(0) nfsup(`nfsup') nmove(0) maxdisp(0) ///
+            fdet(`"`families_detected'"') fcon(`"`families_confirmed'"') ///
+            frel(`"`families_related'"') famb(`"`families_ambiguous'"') ///
+            fsup(`"`families_suppressed'"')
         return add
         exit
     }
@@ -114,9 +126,12 @@ program define varorder, rclass
     _varorder_apply, neworder(`proposed') expectedold(`old')
     local changed = r(changed)
     if `changed' di as result "Variable order updated."
-    _varorder_returns, oldorder(`"`old'"') neworder(`"`proposed'"') k(`k') changed(`changed') ///
+    _varorder_returns, oldorder(`old') neworder(`proposed') k(`k') changed(`changed') ///
         nfdet(`nfdet') nfcon(`nfcon') nfrel(`nfrel') nfamb(`nfamb') ///
-        nfchanged(`nfchanged') nfsup(`nfsup') nmove(`nmove') maxdisp(`maxdisp')
+        nfchanged(`nfchanged') nfsup(`nfsup') nmove(`nmove') maxdisp(`maxdisp') ///
+        fdet(`"`families_detected'"') fcon(`"`families_confirmed'"') ///
+        frel(`"`families_related'"') famb(`"`families_ambiguous'"') ///
+        fchanged(`"`families_changed'"') fsup(`"`families_suppressed'"')
     return add
 end
 
@@ -159,6 +174,12 @@ program define _varorder_plan, rclass
     return local family_names `"`__vo_families'"'
     return local family_states `"`__vo_fstates'"'
     return local family_reasons `"`__vo_freasons'"'
+    return local families_detected `"`__vo_families_detected'"'
+    return local families_confirmed `"`__vo_families_confirmed'"'
+    return local families_related `"`__vo_families_related'"'
+    return local families_ambiguous `"`__vo_families_ambiguous'"'
+    return local families_changed `"`__vo_families_changed'"'
+    return local families_suppressed `"`__vo_families_suppressed'"'
 end
 
 program define _varorder_apply, rclass
@@ -236,7 +257,7 @@ program define _varorder_undo, rclass
     }
     if `changed' di as result "Variable order restored."
     else di as result "Stored variable order was already in place."
-    _varorder_returns, oldorder(`"`current'"') neworder(`"`__vo_undo_order'"') k(`k') changed(`changed') ///
+    _varorder_returns, oldorder(`current') neworder(`__vo_undo_order') k(`k') changed(`changed') ///
         nfdet(0) nfcon(0) nfrel(0) nfamb(0) nfchanged(0) nfsup(0) ///
         nmove(`nmove') maxdisp(`maxdisp')
     return add
@@ -281,9 +302,11 @@ end
 
 program define _varorder_returns, rclass
     version 16.0
-    syntax , OLDORDER(string asis) NEWORDER(string asis) K(integer) CHANGED(integer) ///
+    syntax , OLDORDER(varlist) NEWORDER(varlist) K(integer) CHANGED(integer) ///
         NFDET(integer) NFCON(integer) NFREL(integer) NFAMB(integer) ///
-        NFCHANGED(integer) NFSUP(integer) NMOVE(integer) MAXDISP(integer)
+        NFCHANGED(integer) NFSUP(integer) NMOVE(integer) MAXDISP(integer) ///
+        [FDET(string) FCON(string) FREL(string) FAMB(string) ///
+        FCHANGED(string) FSUP(string)]
     return scalar changed = `changed'
     return scalar k = `k'
     return scalar n_families_detected = `nfdet'
@@ -297,6 +320,12 @@ program define _varorder_returns, rclass
     return scalar order_lists_returned = 1
     return local oldorder `"`oldorder'"'
     return local neworder `"`neworder'"'
+    return local families_detected `"`fdet'"'
+    return local families_confirmed `"`fcon'"'
+    return local families_related `"`frel'"'
+    return local families_ambiguous `"`famb'"'
+    return local families_changed `"`fchanged'"'
+    return local families_suppressed `"`fsup'"'
 end
 
 mata:
@@ -595,7 +624,7 @@ void _varorder_make_plan()
     string scalar canon
     string colvector choices
     string rowvector vn,fam,grp,state,key,reason,sys,skey,allf,fs,fr,neworder,vfamily,vdom,vi
-    real rowvector kval, anchors, ord, members, emitted, classix, idx, gx,vinfo,matches
+    real rowvector kval, anchors, ord, members, emitted, classix, idx, gx,vinfo,matches,changedmask
     struct vo_parse scalar pn,pl,pt
     k=st_nvar(); vn=J(1,k,""); fam=state=key=reason=sys=skey=vfamily=vdom=J(1,k,""); kval=J(1,k,.); vinfo=J(1,k,0)
     for (i=1;i<=k;i++) {
@@ -723,8 +752,8 @@ void _varorder_make_plan()
     }
     nmove=0;maxd=0
     for(i=1;i<=k;i++) { newpos=select(1..k,neworder:==vn[i]); if(newpos!=i) { nmove++; maxd=max((maxd,abs(newpos-i))); }; }
-    nfchanged=0
-    for(g=1;g<=cols(allf);g++) if(fs[g]=="confirmed") { members=select(1..k,grp:==allf[g]); if(any(neworder[members]:!=vn[members])) nfchanged++; }
+    nfchanged=0; changedmask=J(1,cols(allf),0)
+    for(g=1;g<=cols(allf);g++) if(fs[g]=="confirmed") { members=select(1..k,grp:==allf[g]); if(any(neworder[members]:!=vn[members])) { nfchanged++; changedmask[g]=1; } }
     classix=select(1..k,state:!="")
     st_local("__vo_new",invtokens(neworder)); st_local("__vo_nfdet",strofreal(sum(fs:!="unrelated")))
     st_local("__vo_nfcon",strofreal(sum(fs:=="confirmed"))); st_local("__vo_nfrel",strofreal(sum(fs:=="related"))); st_local("__vo_nfamb",strofreal(sum(fs:=="ambiguous")))
@@ -734,6 +763,9 @@ void _varorder_make_plan()
     st_local("__vo_classvars",invtokens(vn[classix])); st_local("__vo_classfams",invtokens(fam[classix])); st_local("__vo_classstates",invtokens(state[classix])); st_local("__vo_classkeys",invtokens(key[classix])); st_local("__vo_classreasons",invtokens(reason[classix]))
     for(i=1;i<=cols(allf);i++) { if(strpos(allf[i],"@")) allf[i]=substr(allf[i],1,strpos(allf[i],"@")-1); allf[i]=subinstr(allf[i]," ","_",.); }
     idx=select(1..cols(allf),fs:!="unrelated"); st_local("__vo_families",invtokens(allf[idx])); st_local("__vo_fstates",invtokens(fs[idx])); st_local("__vo_freasons",invtokens(fr[idx]))
+    idx=select(1..cols(allf),fs:!="unrelated"); canon=""; if(cols(idx)) canon=invtokens(allf[idx]); st_local("__vo_families_detected",canon); idx=select(1..cols(allf),fs:=="confirmed"); canon=""; if(cols(idx)) canon=invtokens(allf[idx]); st_local("__vo_families_confirmed",canon)
+    idx=select(1..cols(allf),fs:=="related"); canon=""; if(cols(idx)) canon=invtokens(allf[idx]); st_local("__vo_families_related",canon); idx=select(1..cols(allf),fs:=="ambiguous"); canon=""; if(cols(idx)) canon=invtokens(allf[idx]); st_local("__vo_families_ambiguous",canon)
+    idx=select(1..cols(allf),changedmask:==1); canon=""; if(cols(idx)) canon=invtokens(allf[idx]); st_local("__vo_families_changed",canon); idx=select(1..cols(allf),(fs:=="related") :| (fs:=="ambiguous")); canon=""; if(cols(idx)) canon=invtokens(allf[idx]); st_local("__vo_families_suppressed",canon)
 }
 
 void _varorder_store_undo(string scalar ord, string scalar fr, string scalar id)

@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 1.1.0 22aug2026}{...}
+{* *! version 1.1.0 23aug2026}{...}
 {vieweralsosee "order" "help order"}{...}
 {vieweralsosee "notes" "help notes"}{...}
 
@@ -51,7 +51,8 @@ When multiple ordered temporal components are supported by the semantic informat
 temporal unless the available semantics support that interpretation.{p_end}
 
 {p 4 6 2}• {bf:Metadata normalization across semantic sources.} Formatting inconsistencies
-such as capitalization, separators, compact forms, and leading zeros may occur in any metadata
+such as capitalization, separators, compact forms, and zero-padding in temporal indexes
+(for example, {cmd:T03} versus {cmd:T3}) may occur in any metadata
 source. {cmd:varorder} normalizes such differences internally for detection while preserving the
 original variable names, labels, notes, and attached value labels and retaining each source separately so that agreement
 and conflict remain detectable.{p_end}
@@ -78,15 +79,15 @@ plan, asks for at most one confirmation, and changes only the physical order of 
 
 {p 8 8 2}{txt:varorder preview summary}{p_end}
 
-{p 8 8 2}{txt:Examined: 106 variables}{p_end}
-{p 8 8 2}{txt:Confirmed temporal structures: 19}{p_end}
-{p 8 8 2}{txt:Variables to be reordered: 101}{p_end}
-{p 8 8 2}{txt:Maximum displacement: 90 columns}{p_end}
+{p 8 8 2}{txt:Examined: 146 variables}{p_end}
+{p 8 8 2}{txt:Confirmed temporal structures: 29}{p_end}
+{p 8 8 2}{txt:Variables to be reordered: 131}{p_end}
+{p 8 8 2}{txt:Maximum displacement: 89 columns}{p_end}
 
 {p 8 8 2}{txt:Issues requiring review:}{p_end}
-{p 10 10 2}{txt:Gap warnings but ordering allowed (1): mobility}{p_end}
-{p 10 10 2}{txt:Related or unverified - no action (6): eng, exercise, lab, mood, promotion_status, reading}{p_end}
-{p 10 10 2}{txt:Ambiguous or conflicting - no action (5): focus, memory, pain, score, survey}{p_end}
+{p 10 10 2}{txt:Gap warnings but ordering allowed (2): mobility, vigor}{p_end}
+{p 10 10 2}{txt:Related/unverified — no action (6): eng, exercise, lab, mood, promotion_status, reading}{p_end}
+{p 10 10 2}{txt:Ambiguous/conflicting — no action (7): focus, memory, mirage, pain, prism_check, score, survey}{p_end}
 
 {p 8 8 2}{txt:All eligible structures will be included in the proposed ordering.}
 {txt:Structures marked as no action will remain unchanged.}{p_end}
@@ -118,19 +119,42 @@ After {cmd:varorder}, the command stores the following in {cmd:r()}:{p_end}
 {synopt:{cmd:r(n_families_confirmed)}}number of confirmed temporal structures{p_end}
 {synopt:{cmd:r(n_families_related)}}number of related or temporally unverified structures{p_end}
 {synopt:{cmd:r(n_families_ambiguous)}}number of ambiguous or conflicting structures{p_end}
-{synopt:{cmd:r(n_families_changed)}}number of confirmed structures proposed for reorganization{p_end}
+{synopt:{cmd:r(n_families_changed)}}number of confirmed structures contributing to changed positions{p_end}
 {synopt:{cmd:r(n_families_suppressed)}}sum of related and ambiguous structures{p_end}
+{synopt:{cmd:r(families_detected)}}identifiers of candidate structures detected{p_end}
+{synopt:{cmd:r(families_confirmed)}}identifiers of confirmed temporal structures{p_end}
+{synopt:{cmd:r(families_related)}}identifiers of related or temporally unverified structures{p_end}
+{synopt:{cmd:r(families_ambiguous)}}identifiers of ambiguous or conflicting structures{p_end}
+{synopt:{cmd:r(families_changed)}}identifiers of confirmed structures contributing to changed positions{p_end}
+{synopt:{cmd:r(families_suppressed)}}identifiers of related and ambiguous structures{p_end}
 {synopt:{cmd:r(n_moved)}}number of variables whose physical positions changed{p_end}
 {synopt:{cmd:r(max_displacement)}}largest position displacement among moved variables{p_end}
 {synopt:{cmd:r(order_lists_returned)}}1 when complete order lists are returned{p_end}
-{synopt:{cmd:r(oldorder)}}complete pre-command physical variable order{p_end}
-{synopt:{cmd:r(neworder)}}complete resulting physical variable order{p_end}
+{synopt:{cmd:r(oldorder)}}complete pre-command physical variable order, directly usable as a varlist{p_end}
+{synopt:{cmd:r(neworder)}}complete resulting physical variable order, directly usable as a varlist{p_end}
 
 
 {title:Compatibility}
 
 {pstd}
 {cmd:varorder} requires Stata 16 or later.{p_end}
+
+
+{title:Version history}
+
+{pstd}
+1.1.0, 23 August 2026. Added a typed temporal-component model and conservative
+support for calendar months, valid ISO dates, fiscal year/quarter, academic
+year/indexed term, extended observation stages, cycle/visit,
+year/quarter/month, and signed relative time. The ordinary syntax, conservative
+no-action rules, one-confirmation workflow, data and metadata preservation, and
+single-level undo remain unchanged. Complete returned order lists are directly
+usable as Stata varlists.{p_end}
+
+{pstd}
+1.0.0, 21 August 2026. Initial SSC release for automatic semantic detection
+and safe temporal ordering from variable names, variable labels, variable
+notes, and attached value-label metadata.{p_end}
 
 
 {title:Author}
