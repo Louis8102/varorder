@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 1.0.0 21aug2026}{...}
+{* *! version 1.1.0 22aug2026}{...}
 {vieweralsosee "order" "help order"}{...}
 {vieweralsosee "notes" "help notes"}{...}
 
@@ -43,10 +43,12 @@ as a variable's measurement occasion.{p_end}
 {p 4 6 2}• {bf:Temporal and hierarchical ordering.} The command recognizes high-confidence
 temporal patterns such as {cmd:T1/T2/T3}, {cmd:Wave 1/2/3}, {cmd:Visit 1/2/3}, explicit calendar
 years, and sequences such as {cmd:pre < mid < post} and
-{cmd:baseline < during treatment < follow-up}. When multiple ordered temporal components are
-supported by the semantic information, {cmd:varorder} can use hierarchical keys such as
-{cmd:year > quarter}, {cmd:grade > term}, or {cmd:day > within-day period}. Bare numeric suffixes are
-not treated as temporal unless the available semantics support that interpretation.{p_end}
+{cmd:screening < baseline < during treatment < discharge < follow-up}. It also supports explicitly
+marked calendar months, valid ISO calendar dates, fiscal year/quarter, academic year/indexed term,
+{cmd:cycle > visit}, {cmd:year > quarter > month}, and signed relative hour/day/week expressions.
+When multiple ordered temporal components are supported by the semantic information,
+{cmd:varorder} uses only frozen, unambiguous precedence. Bare numeric suffixes are not treated as
+temporal unless the available semantics support that interpretation.{p_end}
 
 {p 4 6 2}• {bf:Metadata normalization across semantic sources.} Formatting inconsistencies
 such as capitalization, separators, compact forms, and leading zeros may occur in any metadata
@@ -147,7 +149,7 @@ If you use {cmd:varorder} in research, please cite the software.  Before an
 SSC/RePEc identifier is assigned, the suggested citation is:{p_end}
 
 {phang}
-Ma, H. (2026). {it:varorder: Automated semantic detection and temporal ordering of variables in Stata}. Stata module, version 1.0.0.{p_end}
+Ma, H. (2026). {it:varorder: Automated semantic detection and temporal ordering of variables in Stata}. Stata module, version 1.1.0.{p_end}
 
 
 {title:License}
