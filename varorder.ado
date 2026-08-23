@@ -1,5 +1,4 @@
 *! varorder 1.1.0 22aug2026
-*! conservative automatic temporal ordering for wide-format data
 program define varorder, rclass
     version 16.0
     syntax [, UNDO]
