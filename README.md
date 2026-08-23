@@ -41,17 +41,10 @@ Retrieve the example dataset and the example and test do-files:
 net get varorder, from("https://raw.githubusercontent.com/Louis8102/varorder/main") replace
 ```
 
-Load the original comprehensive example dataset:
+Load the comprehensive example dataset:
 
 ```stata
 use varorder_example_data.dta, clear
-```
-
-Version 1.1.0 also includes an independent simulated dataset covering the new
-temporal systems:
-
-```stata
-use varorder_v110_example_data.dta, clear
 ```
 
 Open the help file:
@@ -64,10 +57,10 @@ Project repository: [github.com/Louis8102/varorder](https://github.com/Louis8102
 
 ## Practical example
 
-The repository includes `varorder_example_data.dta`, a 5,000-observation,
-106-variable development and demonstration dataset with shuffled temporal
-families, metadata conflicts, gaps, collisions, Unicode/string fixtures, and
-system and extended missing values.
+The repository includes one comprehensive `varorder_example_data.dta`: a
+5,000-observation, 146-variable development and demonstration dataset with
+shuffled temporal families, metadata conflicts, gaps, collisions,
+Unicode/string fixtures, and system and extended missing values.
 
 The final six variables specifically demonstrate the fourth semantic source.
 `x345`, `x900`, and `x1000` share the distinctive `marital_status` value domain,
@@ -77,11 +70,11 @@ the proposed relative order is therefore `x900 x1000 x345`. `x930`, `x710`, and
 time evidence, so they are reported as related/unverified and are not
 temporally sorted.
 
-The independent `varorder_v110_example_data.dta` contains 60 simulated
-observations and 43 variables. It demonstrates calendar months, valid ISO
-dates, fiscal year/quarter, academic year/indexed term, extended observation
-stages, cycle/visit, year/quarter/month, and signed relative time. It also
-contains collision and incomparable-system controls and protected metadata.
+The same comprehensive dataset also demonstrates the temporal systems added in
+version 1.1.0: calendar months, valid ISO dates, fiscal year/quarter, academic
+year/indexed term, extended observation stages, cycle/visit,
+year/quarter/month, and signed relative time. It includes normalized-key
+collision and incomparable-system controls and protected metadata.
 
 ```stata
 use "varorder_example_data.dta", clear
@@ -93,15 +86,15 @@ The validated example-data preview is a bounded summary:
 ```text
 varorder preview summary
 
-Examined: 106 variables
-Confirmed temporal structures: 19
-Variables to be reordered: 101
-Maximum displacement: 90 columns
+Examined: 146 variables
+Confirmed temporal structures: 29
+Variables to be reordered: 131
+Maximum displacement: 89 columns
 
 Issues requiring review:
-  Gap warnings but ordering allowed (1): mobility
+  Gap warnings but ordering allowed (2): mobility, vigor
   Related/unverified — no action (6): eng, exercise, lab, mood, promotion_status, reading
-  Ambiguous/conflicting — no action (5): focus, memory, pain, score, survey
+  Ambiguous/conflicting — no action (7): focus, memory, mirage, pain, prism_check, score, survey
 
 All eligible structures will be included in the proposed ordering. Structures marked as no action will remain unchanged.
 
@@ -133,7 +126,8 @@ execution, the absence of genuine keyboard confirmation declines safely.
   fiscal year/quarter, academic year/indexed term, the extended sequence
   screening < baseline < during treatment < discharge < follow-up,
   cycle > visit, year > quarter > month, and signed relative hour/day/week.
-- Case, separator, compact-form, and leading-zero differences are normalized
+- Case, separator, compact-form, and temporal-index zero-padding differences
+  (for example, T03 versus T3) are normalized
   internally for inference. Original names, labels, notes, and attached value
   labels are preserved.
 - Indexed gaps are reported but do not suppress an otherwise unambiguous family;
