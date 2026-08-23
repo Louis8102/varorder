@@ -41,10 +41,17 @@ Retrieve the example dataset and the example and test do-files:
 net get varorder, from("https://raw.githubusercontent.com/Louis8102/varorder/main") replace
 ```
 
-Load the example dataset:
+Load the original comprehensive example dataset:
 
 ```stata
 use varorder_example_data.dta, clear
+```
+
+Version 1.1.0 also includes an independent simulated dataset covering the new
+temporal systems:
+
+```stata
+use varorder_v110_example_data.dta, clear
 ```
 
 Open the help file:
@@ -69,6 +76,12 @@ the proposed relative order is therefore `x900 x1000 x345`. `x930`, `x710`, and
 `x820` share the `promotion_status` value domain but contain no variable-level
 time evidence, so they are reported as related/unverified and are not
 temporally sorted.
+
+The independent `varorder_v110_example_data.dta` contains 60 simulated
+observations and 43 variables. It demonstrates calendar months, valid ISO
+dates, fiscal year/quarter, academic year/indexed term, extended observation
+stages, cycle/visit, year/quarter/month, and signed relative time. It also
+contains collision and incomparable-system controls and protected metadata.
 
 ```stata
 use "varorder_example_data.dta", clear
@@ -116,6 +129,10 @@ execution, the absence of genuine keyboard confirmation declines safely.
   conservative semantic sequences, repeated calendar years when context is
   temporal, and supported hierarchies such as year > quarter, grade > term, and
   day > within-day period.
+- Version 1.1.0 adds explicitly marked calendar months, valid ISO dates,
+  fiscal year/quarter, academic year/indexed term, the extended sequence
+  screening < baseline < during treatment < discharge < follow-up,
+  cycle > visit, year > quarter > month, and signed relative hour/day/week.
 - Case, separator, compact-form, and leading-zero differences are normalized
   internally for inference. Original names, labels, notes, and attached value
   labels are preserved.
@@ -138,7 +155,7 @@ state counts, `r(n_moved)`, `r(max_displacement)`, and the complete
 
 ## Validation and reproducibility
 
-`varorder` requires Stata 16 or later. Version 1.0.0 was developed and validated
+`varorder` requires Stata 16 or later. Version 1.1.0 was developed and validated
 with:
 
 ```text
@@ -169,7 +186,7 @@ GitHub: [Louis8102](https://github.com/Louis8102/)
 ## Citation
 
 Ma, H. (2026). *varorder: Automated semantic detection and temporal ordering of
-variables in Stata*. Stata module, version 1.0.0.
+variables in Stata*. Stata module, version 1.1.0.
 
 Citation metadata are also provided in `CITATION.cff`.
 
