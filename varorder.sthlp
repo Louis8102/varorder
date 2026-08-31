@@ -145,14 +145,9 @@ After {cmd:varorder}, the command stores the following in {cmd:r()}:{p_end}
 {synopt:{cmd:r(audit_variable_reasons)}}variable names, family names, and specific readable explanations for no action{p_end}
 
 {pstd}
-The audit results name each relevant family or variable directly. Evidence sources are written as
-{it:variable name}, {it:variable label}, {it:variable notes}, or
-{it:attached value-label metadata}; they are not returned as numeric identifiers or encoded text.
-A vertical bar separates complete entries. For example, type
-{cmd:display `"`r(audit_variable_reasons)'"'} immediately after {cmd:varorder} to see each affected
-variable, its family, and why no action was taken. If the complete audit results cannot be returned
-safely within Stata's macro limits, {cmd:r(audit_lists_returned)} is 0 and the audit locals are
-empty; counts and the other main stored results remain available.{p_end}
+To view a main stored result, use a command such as
+{cmd:di `"`r(audit_variable_reasons)'"'}; for another result, replace
+{cmd:audit_variable_reasons} with the desired {cmd:r()} name listed above.{p_end}
 
 
 {title:Compatibility}
