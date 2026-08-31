@@ -96,18 +96,12 @@ local example_moved = r(n_moved)
 local example_displacement = r(max_displacement)
 local example_lists = r(order_lists_returned)
 local example_audit_lists = r(audit_lists_returned)
-local example_afids `r(audit_family_ids)'
-local example_afnames `r(audit_family_names)'
-local example_afstates `r(audit_family_states)'
-local example_avars `r(audit_variables)'
-local example_avarids `r(audit_variable_family_ids)'
-local example_avarkeys `r(audit_variable_keys)'
 local example_old `r(oldorder)'
 local example_new `r(neworder)'
 mata: st_numscalar("__tv_quotes",substr(st_global("r(oldorder)"),1,2)==char(96)+char(34) | substr(st_global("r(oldorder)"),-2,2)==char(34)+char(39) | substr(st_global("r(neworder)"),1,2)==char(96)+char(34) | substr(st_global("r(neworder)"),-2,2)==char(34)+char(39))
 mata: st_numscalar("__tv_words",cols(tokens(st_global("r(oldorder)")))==272 & cols(tokens(st_global("r(neworder)")))==272)
-mata: st_numscalar("__tv_afalign",cols(tokens(st_global("r(audit_family_ids)")))==cols(tokens(st_global("r(audit_family_names)"))) & cols(tokens(st_global("r(audit_family_ids)")))==cols(tokens(st_global("r(audit_family_states)"))))
-mata: st_numscalar("__tv_avalign",cols(tokens(st_global("r(audit_variables)")))==cols(tokens(st_global("r(audit_variable_family_ids)"))) & cols(tokens(st_global("r(audit_variables)")))==cols(tokens(st_global("r(audit_variable_keys)"))))
+mata: st_numscalar("__tv_audit_readable",strpos(st_global("r(audit_family_types)"),":")>0 & strpos(st_global("r(audit_family_evidence)"),"variable name")>0 & strpos(st_global("r(audit_family_reasons)"),":")>0 & strpos(st_global("r(audit_variable_keys)"),"temporal key")>0 & strpos(st_global("r(audit_variable_evidence)"),"variable label")>0 & strpos(st_global("r(audit_variable_reasons)"),":")>0 & strpos(st_global("r(audit_variable_reasons)"),"\\u")==0 & strpos(st_global("r(audit_family_evidence)"),"+ +")==0)
+mata: st_numscalar("__tv_audit_hidden",strlen(st_global("r(audit_family_ids)"))==0 & strlen(st_global("r(audit_family_names)"))==0 & strlen(st_global("r(audit_family_states)"))==0 & strlen(st_global("r(audit_variables)"))==0 & strlen(st_global("r(audit_variable_family_ids)"))==0)
 local direct_new_rc = .
 local direct_old_rc = .
 if `is_batch' {
@@ -127,8 +121,8 @@ tvassert `example_ambiguous' == 20
 tvassert `example_suppressed' == 34
 tvassert `example_lists' == 1
 tvassert `example_audit_lists' == 1
-tvassert __tv_afalign == 1
-tvassert __tv_avalign == 1
+tvassert __tv_audit_readable == 1
+tvassert __tv_audit_hidden == 1
 tvassert __tv_quotes == 0
 tvassert __tv_words == 1
 tvasserteq `"`example_old'"' `"`example_before'"'

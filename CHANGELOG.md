@@ -16,9 +16,10 @@ All notable public changes to `varorder` are documented in this file.
 - Added conservative detection of cycles, non-unique orders, incompatible
   references, hierarchy ambiguity, invalid temporal values, and cross-unit
   comparisons.
-- Added complete aligned family- and variable-level audit results without new
-  user syntax. Audit fields use delimiter-safe Unicode encoding and never return
-  silently truncated partial lists.
+- Added concise, self-identifying family- and variable-level audit results
+  without new user syntax. Temporal types, evidence sources, inferred keys, and
+  no-action reasons are returned as readable text; partial results are never
+  silently truncated.
 - Expanded the single public example dataset from 146 to 272 variables by
   adding 126 independently specified V2 cases; production code does not read
   their expected classifications.

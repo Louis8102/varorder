@@ -31,14 +31,9 @@ program define varorder, rclass
     local families_changed `"`r(families_changed)'"'
     local families_suppressed `"`r(families_suppressed)'"'
     local audit_lists_returned = r(audit_lists_returned)
-    local audit_family_ids `"`r(audit_family_ids)'"'
-    local audit_family_names `"`r(audit_family_names)'"'
-    local audit_family_states `"`r(audit_family_states)'"'
     local audit_family_types `"`r(audit_family_types)'"'
     local audit_family_evidence `"`r(audit_family_evidence)'"'
     local audit_family_reasons `"`r(audit_family_reasons)'"'
-    local audit_variables `"`r(audit_variables)'"'
-    local audit_variable_family_ids `"`r(audit_variable_family_ids)'"'
     local audit_variable_keys `"`r(audit_variable_keys)'"'
     local audit_variable_evidence `"`r(audit_variable_evidence)'"'
     local audit_variable_reasons `"`r(audit_variable_reasons)'"'
@@ -115,7 +110,7 @@ program define varorder, rclass
             fsup(`"`families_suppressed'"')
         return add
         return scalar audit_lists_returned = `audit_lists_returned'
-        foreach a in audit_family_ids audit_family_names audit_family_states audit_family_types audit_family_evidence audit_family_reasons audit_variables audit_variable_family_ids audit_variable_keys audit_variable_evidence audit_variable_reasons {
+        foreach a in audit_family_types audit_family_evidence audit_family_reasons audit_variable_keys audit_variable_evidence audit_variable_reasons {
             return local `a' `"``a''"'
         }
         exit
@@ -138,7 +133,7 @@ program define varorder, rclass
             fsup(`"`families_suppressed'"')
         return add
         return scalar audit_lists_returned = `audit_lists_returned'
-        foreach a in audit_family_ids audit_family_names audit_family_states audit_family_types audit_family_evidence audit_family_reasons audit_variables audit_variable_family_ids audit_variable_keys audit_variable_evidence audit_variable_reasons {
+        foreach a in audit_family_types audit_family_evidence audit_family_reasons audit_variable_keys audit_variable_evidence audit_variable_reasons {
             return local `a' `"``a''"'
         }
         exit
@@ -155,7 +150,7 @@ program define varorder, rclass
         fchanged(`"`families_changed'"') fsup(`"`families_suppressed'"')
     return add
     return scalar audit_lists_returned = `audit_lists_returned'
-    foreach a in audit_family_ids audit_family_names audit_family_states audit_family_types audit_family_evidence audit_family_reasons audit_variables audit_variable_family_ids audit_variable_keys audit_variable_evidence audit_variable_reasons {
+    foreach a in audit_family_types audit_family_evidence audit_family_reasons audit_variable_keys audit_variable_evidence audit_variable_reasons {
         return local `a' `"``a''"'
     }
 end
@@ -233,8 +228,6 @@ program define _varorder_apply, rclass
         return scalar changed = 0
         exit
     }
-    quietly _varorder_identity
-    local identity `"`r(identity)'"'
     local fr = c(frame)
     capture noisily order `neworder'
     local applyrc = _rc
@@ -319,7 +312,7 @@ program define _varorder_identity, rclass
     version 16.0
     unab names : _all
     local canonical : list sort names
-    quietly _datasignature `canonical'
+    quietly _datasignature `canonical', fast
     local sig `"`r(datasignature)'"'
     local meta `"`: data label'|`: sortedby'"'
     foreach v of local canonical {
@@ -955,26 +948,68 @@ struct vo_v2graph scalar _v2_graph(real matrix A)
     return(g)
 }
 
-string scalar _v2_hex(string scalar raw)
-{
-    if(raw=="") return("~")
-    return(ustrtohex(raw))
-}
-
-string rowvector _v2_hexv(string matrix raw)
-{
-    string rowvector out
-    real scalar i
-    out=J(1,length(raw),"")
-    for(i=1;i<=length(raw);i++) out[i]=_v2_hex(raw[i])
-    return(out)
-}
-
 string scalar _v2_join(string matrix raw)
 {
     if(length(raw)==0) return("")
     if(length(raw)==1) return(raw[1])
     return(invtokens(rowshape(raw,1)))
+}
+
+string scalar _v2_pipe(string matrix raw)
+{
+    if(length(raw)==0) return("")
+    if(length(raw)==1) return(raw[1])
+    return(invtokens(rowshape(raw,1)," | "))
+}
+
+string scalar _v2_reason_message(string scalar code, string scalar evidence)
+{
+    if(code=="gap") return("an indexed position is missing, but the observed temporal order is unambiguous; ordering allowed")
+    if(code=="temporal_unverified") {
+        if(strpos(evidence,"value_label")) return("attached value-label metadata identifies a related response domain but does not establish the variable's measurement occasion; no action")
+        return("available metadata do not establish a defensible temporal position; no action")
+    }
+    if(code=="explicit_non_temporal") return("metadata explicitly identify the variable as non-temporal; no action")
+    if(code=="construct_conflict") return("metadata sources disagree about construct or family identity; no action")
+    if(code=="position_conflict") return("metadata sources disagree about temporal position; no action")
+    if(code=="temporal_conflict") return("metadata sources disagree about temporal versus non-temporal meaning; no action")
+    if(code=="hierarchy_ambiguous") return("the temporal hierarchy or its precedence is ambiguous; no action")
+    if(code=="hierarchy_conflict") return("metadata sources specify conflicting temporal hierarchies; no action")
+    if(code=="reference_conflict") return("metadata sources specify conflicting relative-time reference events; no action")
+    if(code=="ambiguous_reference_event") return("the relative-time reference event is ambiguous; no action")
+    if(code=="overlapping_family_membership") return("the variable can belong to more than one temporal family; no action")
+    if(code=="normalized_key_collision") return("multiple variables map to the same normalized temporal position; no action")
+    if(code=="incomplete_temporal_structure") return("the temporal components or precedence information are incomplete; no action")
+    if(code=="invalid_temporal_value") return("the stated temporal value is invalid; no action")
+    if(code=="cyclic_precedence") return("the temporal precedence constraints form a cycle; no action")
+    if(code=="nonunique_topological_order") return("the temporal constraints permit more than one valid order; no action")
+    if(code=="disconnected_temporal_graph") return("the temporal precedence graph is disconnected; no action")
+    if(code=="incomparable_temporal_system") return("the temporal components use incomparable ordering systems; no action")
+    return(subinstr(code,"_"," ",.)+"; no action")
+}
+
+string scalar _v2_evidence_message(string scalar evidence)
+{
+    string rowvector out
+    out=J(1,0,"")
+    if(strpos("+"+evidence+"+","+name+")) out=out,"variable name"
+    if(strpos("+"+evidence+"+","+label+")) out=out,"variable label"
+    if(strpos("+"+evidence+"+","+notes+")) out=out,"variable notes"
+    if(strpos("+"+evidence+"+","+value_label+")) out=out,"attached value-label metadata"
+    return(cols(out) ? invtokens(out," + ") : "no informative metadata source")
+}
+
+string scalar _v2_type_message(string scalar type)
+{
+    if(type=="indexed") return("indexed temporal sequence")
+    if(type=="stage") return("semantic stage sequence")
+    if(type=="calendar_date") return("calendar-date sequence")
+    if(type=="explicit_relation") return("explicit precedence sequence")
+    if(type=="explicit_hierarchy") return("explicit temporal hierarchy")
+    if(type=="relative_mixed") return("mixed-unit relative-time sequence")
+    if(substr(type,1,9)=="relative_") return(subinstr(substr(type,10,.),"_"," ",.)+" relative-time sequence")
+    if(type=="unresolved") return("unresolved temporal structure")
+    return(subinstr(type,"_"," ",.)+" temporal structure")
 }
 
 real rowvector _v2_which(real matrix mask)
@@ -1003,15 +1038,20 @@ string scalar _v2_short_family(string scalar raw)
 void _varorder_make_plan_v2()
 {
     real scalar k,i,j,g,pos,newpos,nmove,maxd,nfchanged,conf,nvalid,nunresolved,collision,gap,hasrel,allnegative,alltemporal,refconf,hierconf,schemaconf,overlap,linkok,cyc,nf,ii,jj,found,changed,limit,maxaudit
-    string scalar canon,chosen,cluster,primary,rawid,typesig,ev,common,metatext,afidsout,afnamesout,afstatesout,aftypesout,afevidenceout,afreasonsout,avarsout,avaridsout,avarkeysout,avarevidenceout,avarreasonsout
-    string rowvector vn,fam,ofam,ufam,fmap,grp,state,key,skey,reason,schema,reference,hierarchy,node,evidence,allf,fs,fr,ft,fe,fid,neworder,cfam,labfam,notefam,namefam,vfamily,vdom,vi,eps,from,to,rawmembers,auditids,auditkeys,auditev,auditreason,schemaset,audfr,leftparts,rightparts
-    real rowvector anchors,members,emitted,rank,ord,idx,changedmask,kval1,vinfo,tinfo,tempmembers,obsmap,auditvars
+    string scalar canon,chosen,cluster,primary,typesig,ev,common,metatext,afidsout,afnamesout,afstatesout,aftypesout,afevidenceout,afreasonsout,avarsout,avaridsout,avarkeysout,avarevidenceout,avarreasonsout
+    string rowvector vn,fam,ofam,ufam,fmap,grp,state,key,skey,reason,schema,reference,hierarchy,node,evidence,allf,fs,fr,ft,fe,fid,neworder,cfam,labfam,notefam,namefam,vfamily,vdom,vi,eps,from,to,auditids,auditkeys,auditev,schemaset,leftparts,rightparts,familymessages,variablemessages,familytypemessages,familyevidencemessages,variablekeymessages,variableevidencemessages
+    real rowvector anchors,members,emitted,rank,ord,idx,changedmask,kval1,vinfo,tinfo,tempmembers,obsmap,auditvars,issuefamilies,noactionvars
     real matrix A,E,R
     struct vo_v2parse scalar pn,pl,pt,px
     struct vo_v2graph scalar gr
     k=st_nvar(); vn=fam=grp=state=skey=reason=schema=reference=hierarchy=node=evidence=namefam=labfam=notefam=vfamily=vdom=J(1,k,""); key=J(1,k,"."); kval1=J(1,k,.); vinfo=tinfo=J(1,k,0); rank=J(1,k,.)
     for(i=1;i<=k;i++) {
-        vn[i]=st_varname(i); pn=_v2_parse(vn[i],"name"); pl=_v2_parse(st_local("__vo_lab"+strofreal(i)),"label"); pt=_v2_parse(st_local("__vo_note"+strofreal(i)),"notes"); vi=_vo_value_info(st_local("__vo_vlname"+strofreal(i))); vfamily[i]=vi[1]; vdom[i]=vi[2]; vinfo[i]=strtoreal(vi[3])
+        vn[i]=st_varname(i)
+        pn=_v2_parse(vn[i],"name")
+        pl=_v2_parse(st_local("__vo_lab"+strofreal(i)),"label")
+        pt=_v2_parse(st_local("__vo_note"+strofreal(i)),"notes")
+        vi=_vo_value_info(st_local("__vo_vlname"+strofreal(i)))
+        vfamily[i]=vi[1]; vdom[i]=vi[2]; vinfo[i]=strtoreal(vi[3])
         namefam[i]=pn.family; labfam[i]=pl.family; notefam[i]=pt.family
         if(ustrregexm(_vo_norm(vn[i]),"^(v|var|x|item|q|u|p|r|k|n|c|d|h|b|w) [0-9]+$")) { namefam[i]=""; pn.schema=""; pn.key="."; pn.skey=""; pn.kval=J(1,0,.); pn.temporal=0; pn.negative=0; pn.unresolved=0; pn.invalid=0; }
         if(pn.schema=="year" & ustrregexm(vn[i],"[[:alpha:]][12][0-9][0-9][0-9]")) { pn.temporal=0; pn.schema="related"; pn.key="."; pn.skey=""; pn.kval=J(1,0,.); pn.unresolved=0; }
@@ -1152,7 +1192,7 @@ void _varorder_make_plan_v2()
     }
     nf=cols(allf); fs=fr=ft=fe=fid=J(1,nf,""); anchors=J(1,nf,.); changedmask=J(1,nf,0)
     for(g=1;g<=nf;g++) {
-        members=_v2_which(grp:==allf[g]); anchors[g]=min(members); rawmembers=sort(vn[members]',1)'; canon=fam[members[1]]; cluster=substr(allf[g],strpos(allf[g],"@")+1,.)
+        members=_v2_which(grp:==allf[g]); anchors[g]=min(members); canon=fam[members[1]]; cluster=substr(allf[g],strpos(allf[g],"@")+1,.)
         if(anyof(("t","time","wave","visit","index"),cluster)) ft[g]="indexed"
         else if(cluster=="date") ft[g]="calendar_date"
         else if(cluster=="relation") ft[g]="explicit_relation"
@@ -1236,7 +1276,7 @@ void _varorder_make_plan_v2()
         }
         fr[g]=(primary=="" ? (gap ? "gap" : ".") : primary)
         ev=""; for(i=1;i<=cols(members);i++) if(evidence[members[i]]!="" & !strpos("+"+ev+"+","+"+evidence[members[i]]+"+")) ev=(ev=="" ? evidence[members[i]] : ev+"+"+evidence[members[i]])
-        fe[g]=ev; rawid="family="+canon+";type="+cluster+";members="+invtokens(rawmembers,","); fid[g]=rawid
+        fe[g]=ev; fid[g]="F"+sprintf("%03.0f",g)
         for(i=1;i<=cols(members);i++) { state[members[i]]=fs[g]; if(fr[g]!=".") reason[members[i]]=fr[g]; }
     }
     for(i=1;i<=k;i++) if(reason[i]=="overlapping_family_membership") state[i]="ambiguous"
@@ -1266,11 +1306,35 @@ void _varorder_make_plan_v2()
     cfam=J(1,nf,""); for(g=1;g<=nf;g++) cfam[g]=_v2_short_family(substr(allf[g],1,strpos(allf[g],"@")-1))
     st_local("__vo_families",_v2_join(_v2_pick(cfam,idx))); st_local("__vo_fstates",_v2_join(_v2_pick(fs,idx))); st_local("__vo_freasons",_v2_join(_v2_pick(fr,idx)))
     st_local("__vo_families_detected",_v2_join(_v2_pick(cfam,idx))); st_local("__vo_families_confirmed",_v2_join(_v2_pick(cfam,_v2_which(fs:=="confirmed")))); st_local("__vo_families_related",_v2_join(_v2_pick(cfam,_v2_which(fs:=="related")))); st_local("__vo_families_ambiguous",_v2_join(_v2_pick(cfam,_v2_which(fs:=="ambiguous")))); st_local("__vo_families_changed",_v2_join(_v2_pick(cfam,_v2_which(changedmask:==1)))); st_local("__vo_families_suppressed",_v2_join(_v2_pick(cfam,_v2_which((fs:=="related") :| (fs:=="ambiguous")))))
-    audfr=fr; for(i=1;i<=cols(audfr);i++) if(audfr[i]==".") audfr[i]=""
-    afidsout=_v2_join(_v2_hexv(_v2_pick(fid,idx))); afnamesout=_v2_join(_v2_hexv(_v2_pick(cfam,idx))); afstatesout=_v2_join(_v2_hexv(_v2_pick(fs,idx))); aftypesout=_v2_join(_v2_hexv(_v2_pick(ft,idx))); afevidenceout=_v2_join(_v2_hexv(_v2_pick(fe,idx))); afreasonsout=_v2_join(_v2_hexv(_v2_pick(audfr,idx)))
-    auditids=auditkeys=auditev=auditreason=J(1,cols(auditvars),"")
-    for(i=1;i<=cols(auditvars);i++) { ii=auditvars[i]; idx=_v2_which(allf:==grp[ii]); auditids[i]=fid[idx[1]]; auditkeys[i]=(key[ii]=="." ? "" : key[ii]); auditev[i]=evidence[ii]; auditreason[i]=(reason[ii]=="." ? "" : reason[ii]); }
-    avarsout=_v2_join(_v2_hexv(_v2_pick(vn,auditvars))); avaridsout=_v2_join(_v2_hexv(auditids)); avarkeysout=_v2_join(_v2_hexv(auditkeys)); avarevidenceout=_v2_join(_v2_hexv(auditev)); avarreasonsout=_v2_join(_v2_hexv(auditreason))
+    afidsout=_v2_join(_v2_pick(fid,idx)); afnamesout=_v2_join(_v2_pick(cfam,idx)); afstatesout=_v2_join(_v2_pick(fs,idx))
+    familytypemessages=familyevidencemessages=J(1,cols(idx),"")
+    for(i=1;i<=cols(idx);i++) {
+        g=idx[i]
+        familytypemessages[i]=cfam[g]+": "+_v2_type_message(ft[g])
+        familyevidencemessages[i]=cfam[g]+": "+_v2_evidence_message(fe[g])
+    }
+    aftypesout=_v2_pipe(familytypemessages); afevidenceout=_v2_pipe(familyevidencemessages)
+    issuefamilies=_v2_which((fr:!=".") :& (fs:!="unrelated")); familymessages=J(1,cols(issuefamilies),"")
+    for(i=1;i<=cols(issuefamilies);i++) { g=issuefamilies[i]; familymessages[i]=cfam[g]+": "+_v2_reason_message(fr[g],fe[g]); }
+    afreasonsout=_v2_pipe(familymessages)
+    auditids=auditkeys=auditev=J(1,cols(auditvars),"")
+    for(i=1;i<=cols(auditvars);i++) {
+        ii=auditvars[i]; idx=_v2_which(allf:==grp[ii]); auditids[i]=fid[idx[1]]
+        auditkeys[i]=(key[ii]=="." ? "none" : _v2_short_family(key[ii])); auditev[i]=(evidence[ii]=="" ? "none" : evidence[ii])
+    }
+    avarsout=_v2_join(_v2_pick(vn,auditvars)); avaridsout=_v2_join(auditids)
+    variablekeymessages=variableevidencemessages=J(1,cols(auditvars),"")
+    for(i=1;i<=cols(auditvars);i++) {
+        ii=auditvars[i]
+        variablekeymessages[i]=vn[ii]+" ("+_v2_short_family(fam[ii])+"): temporal key "+auditkeys[i]
+        variableevidencemessages[i]=vn[ii]+" ("+_v2_short_family(fam[ii])+"): "+_v2_evidence_message(auditev[i])
+    }
+    avarkeysout=_v2_pipe(variablekeymessages); avarevidenceout=_v2_pipe(variableevidencemessages)
+    noactionvars=_v2_which((state:=="related") :| (state:=="ambiguous")); variablemessages=J(1,cols(noactionvars),"")
+    for(i=1;i<=cols(noactionvars);i++) {
+        ii=noactionvars[i]; variablemessages[i]=vn[ii]+" ("+_v2_short_family(fam[ii])+"): "+_v2_reason_message(reason[ii],evidence[ii])
+    }
+    avarreasonsout=_v2_pipe(variablemessages)
     limit=strtoreal(st_local("__vo_macrolen"))-1024; maxaudit=max((strlen(afidsout),strlen(afnamesout),strlen(afstatesout),strlen(aftypesout),strlen(afevidenceout),strlen(afreasonsout),strlen(avarsout),strlen(avaridsout),strlen(avarkeysout),strlen(avarevidenceout),strlen(avarreasonsout)))
     if(maxaudit<=limit) {
         st_local("__vo_audit_ok","1"); st_local("__vo_audit_family_ids",afidsout); st_local("__vo_audit_family_names",afnamesout); st_local("__vo_audit_family_states",afstatesout); st_local("__vo_audit_family_types",aftypesout); st_local("__vo_audit_family_evidence",afevidenceout); st_local("__vo_audit_family_reasons",afreasonsout); st_local("__vo_audit_variables",avarsout); st_local("__vo_audit_variable_family_ids",avaridsout); st_local("__vo_audit_variable_keys",avarkeysout); st_local("__vo_audit_variable_evidence",avarevidenceout); st_local("__vo_audit_variable_reasons",avarreasonsout)

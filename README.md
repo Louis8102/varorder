@@ -139,7 +139,7 @@ execution, the absence of genuine keyboard confirmation declines safely.
 - Version 2.0.0 unifies supported forms in a common temporal-component and
   constraint engine. It adds additional validated English date surfaces,
   explicit relations for otherwise unknown stages, cycle/non-unique-order
-  suppression, stronger source-aware evidence fusion, and aligned audit results.
+  suppression, stronger source-aware evidence fusion, and readable audit results.
 - Case, separator, compact-form, and temporal-index zero-padding differences
   (for example, T03 versus T3) are normalized
   internally for inference. Original names, labels, notes, and attached value
@@ -159,8 +159,9 @@ execution, the absence of genuine keyboard confirmation declines safely.
 
 After `varorder`, machine-readable results include `r(changed)`, `r(k)`, family
 state counts and names, `r(n_moved)`, `r(max_displacement)`, the complete
-`r(oldorder)` and `r(neworder)` lists, and delimiter-safe aligned family- and
-variable-level audit results. See `help varorder` for the exact list and encoding.
+`r(oldorder)` and `r(neworder)` lists, and self-identifying family- and
+variable-level audit results written in ordinary English. See `help varorder`
+for the exact main stored results.
 
 ## Validation and reproducibility
 
