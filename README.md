@@ -58,9 +58,12 @@ Project repository: [github.com/Louis8102/varorder](https://github.com/Louis8102
 ## Practical example
 
 The repository includes one comprehensive `varorder_example_data.dta`: a
-5,000-observation, 146-variable development and demonstration dataset with
-shuffled temporal families, metadata conflicts, gaps, collisions,
-Unicode/string fixtures, and system and extended missing values.
+5,000-observation, 272-variable development and demonstration dataset. It
+retains the 146 variables used through version 1.1.0 and adds 126 independently
+specified version 2.0.0 variables. The added variables exercise generalized
+temporal components, explicit precedence constraints, additional date surfaces,
+four-source evidence fusion, cycles, non-unique orders, incompatible systems,
+deep hierarchies, and conservative false-positive controls.
 
 The final six variables specifically demonstrate the fourth semantic source.
 `x345`, `x900`, and `x1000` share the distinctive `marital_status` value domain,
@@ -70,11 +73,18 @@ the proposed relative order is therefore `x900 x1000 x345`. `x930`, `x710`, and
 time evidence, so they are reported as related/unverified and are not
 temporally sorted.
 
-The same comprehensive dataset also demonstrates the temporal systems added in
+The same comprehensive dataset demonstrates the temporal systems added in
 version 1.1.0: calendar months, valid ISO dates, fiscal year/quarter, academic
 year/indexed term, extended observation stages, cycle/visit,
 year/quarter/month, and signed relative time. It includes normalized-key
 collision and incomparable-system controls and protected metadata.
+
+The 126 version 2.0.0 variables add English calendar-date surfaces such as
+`Jan 2, 2026`, explicit ordering for otherwise unknown stages, additional
+relative-time and hierarchy combinations, uniquely ordered and non-unique
+constraint graphs, cycles, conflicting references, and opaque-name evidence
+fusion. These are general rule fixtures, not names recognized by production
+code.
 
 ```stata
 use "varorder_example_data.dta", clear
@@ -86,15 +96,15 @@ The validated example-data preview is a bounded summary:
 ```text
 varorder preview summary
 
-Examined: 146 variables
-Confirmed temporal structures: 29
-Variables to be reordered: 131
+Examined: 272 variables
+Confirmed temporal structures: 48
+Variables to be reordered: 186
 Maximum displacement: 89 columns
 
 Issues requiring review:
-  Gap warnings but ordering allowed (2): mobility, vigor
-  Related/unverified — no action (6): eng, exercise, lab, mood, promotion_status, reading
-  Ambiguous/conflicting — no action (7): focus, memory, mirage, pain, prism_check, score, survey
+  Gap warnings but ordering allowed (3): fortitude, mobility, vigor
+  Related/unverified — no action (14): barcode, batchcode, chronological_comfort, eng, exercise, lab, moduleitem, mood, ...
+  Ambiguous/conflicting — no action (20): acoustic_calibration, apex, decision_confidence, finance, focus, memory, mirage, motor_coordination, ...
 
 All eligible structures will be included in the proposed ordering. Structures marked as no action will remain unchanged.
 
@@ -126,6 +136,10 @@ execution, the absence of genuine keyboard confirmation declines safely.
   fiscal year/quarter, academic year/indexed term, the extended sequence
   screening < baseline < during treatment < discharge < follow-up,
   cycle > visit, year > quarter > month, and signed relative hour/day/week.
+- Version 2.0.0 unifies supported forms in a common temporal-component and
+  constraint engine. It adds additional validated English date surfaces,
+  explicit relations for otherwise unknown stages, cycle/non-unique-order
+  suppression, stronger source-aware evidence fusion, and aligned audit results.
 - Case, separator, compact-form, and temporal-index zero-padding differences
   (for example, T03 versus T3) are normalized
   internally for inference. Original names, labels, notes, and attached value
@@ -144,12 +158,13 @@ execution, the absence of genuine keyboard confirmation declines safely.
 ## Returned results
 
 After `varorder`, machine-readable results include `r(changed)`, `r(k)`, family
-state counts, `r(n_moved)`, `r(max_displacement)`, and the complete
-`r(oldorder)` and `r(neworder)` lists. See `help varorder` for the exact list.
+state counts and names, `r(n_moved)`, `r(max_displacement)`, the complete
+`r(oldorder)` and `r(neworder)` lists, and delimiter-safe aligned family- and
+variable-level audit results. See `help varorder` for the exact list and encoding.
 
 ## Validation and reproducibility
 
-`varorder` requires Stata 16 or later. Version 1.1.0 was developed and validated
+`varorder` requires Stata 16 or later. Version 2.0.0 was developed and validated
 with:
 
 ```text
@@ -180,7 +195,7 @@ GitHub: [Louis8102](https://github.com/Louis8102/)
 ## Citation
 
 Ma, H. (2026). *varorder: Automated semantic detection and temporal ordering of
-variables in Stata*. Stata module, version 1.1.0.
+variables in Stata*. Stata module, version 2.0.0.
 
 Citation metadata are also provided in `CITATION.cff`.
 

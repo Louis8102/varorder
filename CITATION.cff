@@ -5,9 +5,10 @@ type: software
 authors:
   - family-names: Ma
     given-names: Hao
-version: 1.1.0
-date-released: 2026-08-23
+version: 2.0.0
+date-released: 2026-08-31
 license: GPL-3.0-only
 abstract: >-
   A Stata module for metadata-aware, ambiguity-aware automatic detection and
-  safe temporal reorganization of variable families in wide-format datasets.
+  safe constraint-based temporal reorganization of variable families in
+  wide-format datasets.
