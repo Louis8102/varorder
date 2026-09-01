@@ -161,13 +161,12 @@ program define _varorder_plan, rclass
     local __vo_k : word count `__vo_old'
     forvalues __vo_i = 1/`__vo_k' {
         local __vo_v : word `__vo_i' of `__vo_old'
-        local __vo_lab`__vo_i' : variable label `__vo_v'
-        local __vo_vlname`__vo_i' : value label `__vo_v'
-        notes _count __vo_nn : `__vo_v'
+        local __vo_nn : char `__vo_v'[note0]
+        if `"`__vo_nn'"' == "" local __vo_nn 0
         local __vo_note`__vo_i' ""
         if `__vo_nn' > 0 {
             forvalues __vo_j = 1/`__vo_nn' {
-                notes _fetch __vo_one_note : `__vo_v' `__vo_j'
+                local __vo_one_note : char `__vo_v'[note`__vo_j']
                 local __vo_note`__vo_i' `"`__vo_note`__vo_i'' `__vo_one_note'"'
             }
         }
@@ -368,7 +367,24 @@ struct vo_parse {
 
 string scalar _vo_norm(string scalar raw)
 {
-    string scalar s
+    string scalar s,out,ch,lastch,letters,upper,digits
+    real scalar i,type,prevtype,camel
+    if(strlen(raw)==ustrlen(raw)) {
+        letters="abcdefghijklmnopqrstuvwxyz"; upper="ABCDEFGHIJKLMNOPQRSTUVWXYZ"; digits="0123456789"; out=""; prevtype=0
+        for(i=1;i<=strlen(raw);i++) {
+            ch=substr(raw,i,1); type=(strpos(letters,ch) | strpos(upper,ch) ? 1 : (strpos(digits,ch) ? 2 : 0)); camel=0
+            if(type==1 & strpos(upper,ch) & i>=4) camel=(strpos(letters,substr(raw,i-1,1)) & strpos(letters,substr(raw,i-2,1)) & strpos(letters,substr(raw,i-3,1)))
+            if(type==0) {
+                if(out!="" & substr(out,-1,1)!=" ") out=out+" "
+                prevtype=0
+            }
+            else {
+                if((camel | (prevtype>0 & prevtype!=type)) & out!="" & substr(out,-1,1)!=" ") out=out+" "
+                out=out+strlower(ch); prevtype=type
+            }
+        }
+        return(strtrim(out))
+    }
     s = ustrregexra(raw, "([a-z][a-z][a-z])([A-Z])", "$1 $2")
     s = ustrlower(ustrtrim(s))
     s = ustrregexra(s, "[^\p{L}\p{N}]+", " ")
@@ -382,22 +398,31 @@ real scalar _vo_has(string scalar s, string scalar re)
     return(ustrregexm(" "+s+" ", re))
 }
 
+real scalar _vo_numeric_token(string scalar s)
+{
+    return(s!="" & strtoreal(s)<.)
+}
+
 string scalar _vo_clean_family(string scalar s, real scalar temporalcontext)
 {
     string rowvector t, keep
     real scalar i,stagecontext
-    stagecontext = temporalcontext & ustrregexm(" "+s+" ", " (before|during|after|pre|mid|post) (treatment|intervention|therapy|program) ")
+    string scalar padded
+    padded=" "+s+" "; stagecontext=0
+    if(temporalcontext & (strpos(padded," treatment ") | strpos(padded," intervention ") | strpos(padded," therapy ") | strpos(padded," program "))) {
+        stagecontext=(strpos(padded," before treatment ") | strpos(padded," before intervention ") | strpos(padded," before therapy ") | strpos(padded," before program ") | strpos(padded," during treatment ") | strpos(padded," during intervention ") | strpos(padded," during therapy ") | strpos(padded," during program ") | strpos(padded," after treatment ") | strpos(padded," after intervention ") | strpos(padded," after therapy ") | strpos(padded," after program ") | strpos(padded," pre treatment ") | strpos(padded," pre intervention ") | strpos(padded," pre therapy ") | strpos(padded," pre program ") | strpos(padded," mid treatment ") | strpos(padded," mid intervention ") | strpos(padded," mid therapy ") | strpos(padded," mid program ") | strpos(padded," post treatment ") | strpos(padded," post intervention ") | strpos(padded," post therapy ") | strpos(padded," post program "))
+    }
     t = tokens(s); keep = J(1,0,"")
     for (i=1; i<=cols(t); i++) {
         if (anyof(("a","id","score","scores","measure","measures","measurement","measurements","repeated","assessment","assessments","outcome","outcomes","calendar","year","quarter","month","fiscal","fy","grade","academic","term","semester","developmental","within","hour","hours","day","days","week","weeks","period","cycle","then","in","of","for","hierarchy","related","setting","context","location","home","school","community","work","commute","indoor","outdoor","time","wave","visit","t","q","m","g","questionnaire","item","form","batch","identifier","not","temporal"), t[i])) continue
         if (temporalcontext & anyof(("pre","mid","post","pretest","posttest","baseline","screening","discharge","followup","follow","up","before","during","after","at","position","unknown","unspecified","occasion","phase"),t[i])) continue
         if (stagecontext & anyof(("treatment","intervention","therapy","program"),t[i])) continue
-        if (ustrregexm(t[i], "^[0-9]+$")) continue
+        if (_vo_numeric_token(t[i])) continue
         if (anyof(("fall","spring","morning","afternoon","evening"),t[i])) continue
         keep = keep,t[i]
     }
     if (cols(keep)==0) {
-        if (_vo_has(s," score ")) return("score")
+        if (strpos(" "+s+" "," score ")) return("score")
         return("")
     }
     if (cols(keep)==1 & ustrlen(keep[1])==1) return("")
@@ -436,7 +461,7 @@ string scalar _vo_clean_value_name(string scalar raw)
     t=tokens(_vo_norm(raw)); keep=J(1,0,"")
     for(i=1;i<=cols(t);i++) {
         if(anyof(("value","values","label","labels","lbl","vl","domain","code","codes","generic","answer","answers","response","responses","category","categories","phase"),t[i])) continue
-        if(ustrregexm(t[i],"^[0-9]+$")) continue
+        if(_vo_numeric_token(t[i])) continue
         keep=keep,t[i]
     }
     if(cols(keep)==0) return("")
@@ -466,7 +491,7 @@ string rowvector _vo_value_info(string scalar labelname)
         for(i=1;i<=cols(nt);i++) {
             toks=tokens(nt[i])
             for(j=1;j<=cols(toks);j++) {
-                if(ustrregexm(toks[j],"^[0-9]+$") | _vo_generic_value_token(toks[j])) continue
+                if(_vo_numeric_token(toks[j]) | _vo_generic_value_token(toks[j])) continue
                 if(!anyof(distinctive,toks[j])) distinctive=distinctive,toks[j]
             }
         }
@@ -476,13 +501,22 @@ string rowvector _vo_value_info(string scalar labelname)
     return((fam,sig,"1"))
 }
 
-struct vo_parse scalar _vo_parse_source(string scalar raw)
+real scalar _vo_rx_cued(string scalar s, string rowvector cues, string scalar re)
+{
+    real scalar i
+    if(cols(cues)) {
+        for(i=1;i<=cols(cues);i++) if(strpos(s,cues[i])) return(ustrregexm(s,re))
+        return(0)
+    }
+    return(ustrregexm(s,re))
+}
+
+struct vo_parse scalar _vo_parse_source(string scalar raw, string scalar s)
 {
     struct vo_parse scalar p
-    string scalar s, sr, fam, m, unit
+    string scalar sr, fam, m, unit
     real scalar n, q, g, d, per, yr, mo, dy, cy, vi, tm
     p.family=""; p.system=""; p.key="."; p.reason=""; p.temporal=0; p.negative=0; p.ambiguous=0; p.unresolved=0; p.kval=J(1,0,.)
-    s = _vo_norm(raw)
     if (s=="") return(p)
     sr=ustrregexra(raw, "([a-z][a-z][a-z])([A-Z])", "$1 $2")
     sr=ustrlower(ustrtrim(sr))
@@ -491,85 +525,85 @@ struct vo_parse scalar _vo_parse_source(string scalar raw)
     p.unresolved = ustrregexm(" "+s+" ", " (temporal position|time point|measurement occasion) (unknown|unspecified) ")
 
     /* Most-specific typed components are recognized before their parts. */
-    if (ustrregexm(" "+sr+" ", "(^|[^0-9])([12][0-9][0-9][0-9])-([0-9][0-9])-([0-9][0-9])($|[^0-9])")) {
+    if (_vo_rx_cued(" "+sr+" ",("-"), "(^|[^0-9])([12][0-9][0-9][0-9])-([0-9][0-9])-([0-9][0-9])($|[^0-9])")) {
         yr=strtoreal(ustrregexs(2)); mo=strtoreal(ustrregexs(3)); dy=strtoreal(ustrregexs(4))
         p.system="calendar_date"; p.kval=(yr,mo,dy); p.key=strofreal(yr)+":"+strofreal(mo)+":"+strofreal(dy)
         if (_vo_valid_calendar_date(yr,mo,dy)) p.temporal=1
         else { p.ambiguous=1; p.reason="invalid_temporal_value"; }
     }
-    else if (ustrregexm(" "+s+" ", " (fy|fiscal year) 0*([12][0-9][0-9][0-9]) (q|quarter) 0*([0-9]+) (m|month) 0*([0-9]+) ")) {
+    else if (_vo_rx_cued(" "+s+" ",(" fy "," fiscal year "), " (fy|fiscal year) 0*([12][0-9][0-9][0-9]) (q|quarter) 0*([0-9]+) (m|month) 0*([0-9]+) ")) {
         yr=strtoreal(ustrregexs(2)); q=strtoreal(ustrregexs(4)); mo=strtoreal(ustrregexs(6))
         p.system="fiscal_hierarchy_unsupported"; p.kval=(yr,q,mo); p.key=strofreal(yr)+":"+strofreal(q)+":"+strofreal(mo); p.ambiguous=1; p.reason="hierarchy_ambiguous"
     }
-    else if (ustrregexm(" "+s+" ", " ([12][0-9][0-9][0-9]) (q|quarter) 0*([0-9]+) (m|month) 0*([0-9]+) ")) {
+    else if (_vo_rx_cued(" "+s+" ",(" q "," quarter "), " ([12][0-9][0-9][0-9]) (q|quarter) 0*([0-9]+) (m|month) 0*([0-9]+) ")) {
         yr=strtoreal(ustrregexs(1)); q=strtoreal(ustrregexs(3)); mo=strtoreal(ustrregexs(5))
         p.system="year_quarter_month"; p.kval=(yr,q,mo); p.key=strofreal(yr)+":"+strofreal(q)+":"+strofreal(mo)
         if (_vo_month_matches_quarter(q,mo)) p.temporal=1
         else { p.ambiguous=1; p.reason="hierarchy_ambiguous"; }
     }
-    else if (ustrregexm(" "+s+" ", " year ([12][0-9][0-9][0-9]) (q|quarter) 0*([0-9]+) (m|month) 0*([0-9]+) ")) {
+    else if (_vo_rx_cued(" "+s+" ",(" q "," quarter "), " year ([12][0-9][0-9][0-9]) (q|quarter) 0*([0-9]+) (m|month) 0*([0-9]+) ")) {
         yr=strtoreal(ustrregexs(1)); q=strtoreal(ustrregexs(3)); mo=strtoreal(ustrregexs(5))
         p.system="year_quarter_month"; p.kval=(yr,q,mo); p.key=strofreal(yr)+":"+strofreal(q)+":"+strofreal(mo)
         if (_vo_month_matches_quarter(q,mo)) p.temporal=1
         else { p.ambiguous=1; p.reason="hierarchy_ambiguous"; }
     }
-    else if (ustrregexm(" "+s+" ", " fy 0*([12][0-9][0-9][0-9]) (q|quarter) 0*([0-9]+) ")) {
+    else if (_vo_rx_cued(" "+s+" ",(" fy "), " fy 0*([12][0-9][0-9][0-9]) (q|quarter) 0*([0-9]+) ")) {
         yr=strtoreal(ustrregexs(1)); q=strtoreal(ustrregexs(3)); p.system="fiscal_year_quarter"; p.kval=(yr,q); p.key=strofreal(yr)+":"+strofreal(q)
         if (q>=1 & q<=4) p.temporal=1
         else { p.ambiguous=1; p.reason="invalid_temporal_value"; }
     }
-    else if (ustrregexm(" "+s+" ", " fiscal year 0*([12][0-9][0-9][0-9]) (q|quarter) 0*([0-9]+) ")) {
+    else if (_vo_rx_cued(" "+s+" ",(" fiscal year "), " fiscal year 0*([12][0-9][0-9][0-9]) (q|quarter) 0*([0-9]+) ")) {
         yr=strtoreal(ustrregexs(1)); q=strtoreal(ustrregexs(3)); p.system="fiscal_year_quarter"; p.kval=(yr,q); p.key=strofreal(yr)+":"+strofreal(q)
         if (q>=1 & q<=4) p.temporal=1
         else { p.ambiguous=1; p.reason="invalid_temporal_value"; }
     }
-    else if (ustrregexm(" "+s+" ", " academic year 0*([12][0-9][0-9][0-9]) (term|semester) 0*([1-9][0-9]*) ")) {
+    else if (_vo_rx_cued(" "+s+" ",(" academic year "), " academic year 0*([12][0-9][0-9][0-9]) (term|semester) 0*([1-9][0-9]*) ")) {
         yr=strtoreal(ustrregexs(1)); tm=strtoreal(ustrregexs(3)); p.temporal=1; p.system="academic_year_term"; p.kval=(yr,tm); p.key=strofreal(yr)+":"+strofreal(tm)
     }
-    else if (ustrregexm(" "+s+" ", " academic year 0*([12][0-9][0-9][0-9]) (term|semester) 0*([0-9]+) ")) {
+    else if (_vo_rx_cued(" "+s+" ",(" academic year "), " academic year 0*([12][0-9][0-9][0-9]) (term|semester) 0*([0-9]+) ")) {
         yr=strtoreal(ustrregexs(1)); tm=strtoreal(ustrregexs(3)); p.system="academic_year_term"; p.kval=(yr,tm); p.key=strofreal(yr)+":"+strofreal(tm); p.ambiguous=1; p.reason="invalid_temporal_value"
     }
-    else if (ustrregexm(" "+s+" ", " cycle 0*([1-9][0-9]*) visit 0*([1-9][0-9]*) ")) {
+    else if (_vo_rx_cued(" "+s+" ",(" cycle "), " cycle 0*([1-9][0-9]*) visit 0*([1-9][0-9]*) ")) {
         cy=strtoreal(ustrregexs(1)); vi=strtoreal(ustrregexs(2)); p.temporal=1; p.system="cycle_visit"; p.kval=(cy,vi); p.key=strofreal(cy)+":"+strofreal(vi)
     }
-    else if (ustrregexm(" "+s+" ", " cycle 0*([0-9]+) visit 0*([0-9]+) ")) {
+    else if (_vo_rx_cued(" "+s+" ",(" cycle "), " cycle 0*([0-9]+) visit 0*([0-9]+) ")) {
         cy=strtoreal(ustrregexs(1)); vi=strtoreal(ustrregexs(2)); p.system="cycle_visit"; p.kval=(cy,vi); p.key=strofreal(cy)+":"+strofreal(vi); p.ambiguous=1; p.reason="invalid_temporal_value"
     }
-    else if (ustrregexm(" "+s+" ", " (g|grade) 0*([1-9][0-9]*) (fall|spring) ")) {
+    else if (_vo_rx_cued(" "+s+" ",(" fall "," spring "), " (g|grade) 0*([1-9][0-9]*) (fall|spring) ")) {
         g=strtoreal(ustrregexs(2)); per=(ustrregexs(3)=="fall" ? 1 : 2); p.temporal=1; p.system="grade_term"; p.kval=(g,per); p.key=strofreal(g)+":"+strofreal(per)
     }
-    else if (ustrregexm(" "+s+" ", " day 0*([1-9][0-9]*) (morning|afternoon|evening) ")) {
+    else if (_vo_rx_cued(" "+s+" ",(" morning "," afternoon "," evening "), " day 0*([1-9][0-9]*) (morning|afternoon|evening) ")) {
         d=strtoreal(ustrregexs(1)); per=1+(ustrregexs(2)=="afternoon")+2*(ustrregexs(2)=="evening"); p.temporal=1; p.system="day_period"; p.kval=(d,per); p.key=strofreal(d)+":"+strofreal(per)
     }
-    else if (ustrregexm(" "+s+" ", " ([12][0-9][0-9][0-9]) m 0*([0-9]+) ")) {
+    else if (_vo_rx_cued(" "+s+" ",(" m "), " ([12][0-9][0-9][0-9]) m 0*([0-9]+) ")) {
         yr=strtoreal(ustrregexs(1)); mo=strtoreal(ustrregexs(2)); p.system="calendar_month"; p.kval=(yr,mo); p.key=strofreal(yr)+":"+strofreal(mo)
         if (mo>=1 & mo<=12) p.temporal=1
         else { p.ambiguous=1; p.reason="invalid_temporal_value"; }
     }
-    else if (ustrregexm(" "+sr+" ", "(^|[^[:alpha:]])(hours?|days?|weeks?)[ ]*([+-]?[0-9]+)($|[^0-9])")) {
+    else if (_vo_rx_cued(" "+sr+" ",("hour","day","week"), "(^|[^[:alpha:]])(hours?|days?|weeks?)[ ]*([+-]?[0-9]+)($|[^0-9])")) {
         unit=ustrregexs(2); n=strtoreal(ustrregexs(3))
         if (substr(unit,1,4)=="hour") unit="hour"
         else if (substr(unit,1,3)=="day") unit="day"
         else unit="week"
         p.temporal=1; p.system="relative_"+unit; p.kval=n; p.key=strofreal(n)
     }
-    else if (ustrregexm(" "+s+" ", " (t|time|wave|visit) 0*([1-9][0-9]*) ")) {
+    else if (_vo_rx_cued(" "+s+" ",(" t "," time "," wave "," visit "), " (t|time|wave|visit) 0*([1-9][0-9]*) ")) {
         m=ustrregexs(1); n=strtoreal(ustrregexs(2)); p.temporal=1; p.system=m; p.kval=n; p.key=strofreal(n)
     }
-    else if (_vo_has(s," screening ")) { p.temporal=1; p.system="stage"; p.kval=(0,0); p.key="0:0"; }
-    else if (_vo_has(s," pretest ")) { p.temporal=1; p.system="stage"; p.kval=(1,0); p.key="1:0"; }
-    else if (_vo_has(s," posttest ")) { p.temporal=1; p.system="stage"; p.kval=(3,0); p.key="3:0"; }
-    else if (_vo_has(s," baseline ")) { p.temporal=1; p.system="stage"; p.kval=(1,0); p.key="1:0"; }
+    else if (strpos(" "+s+" "," screening ")) { p.temporal=1; p.system="stage"; p.kval=(0,0); p.key="0:0"; }
+    else if (strpos(" "+s+" "," pretest ")) { p.temporal=1; p.system="stage"; p.kval=(1,0); p.key="1:0"; }
+    else if (strpos(" "+s+" "," posttest ")) { p.temporal=1; p.system="stage"; p.kval=(3,0); p.key="3:0"; }
+    else if (strpos(" "+s+" "," baseline ")) { p.temporal=1; p.system="stage"; p.kval=(1,0); p.key="1:0"; }
     else if (ustrregexm(" "+s+" ", " follow up 0*([1-9][0-9]*) ")) { n=strtoreal(ustrregexs(1)); p.temporal=1; p.system="stage"; p.kval=(3,n); p.key="3:"+strofreal(n); }
     else if (ustrregexm(" "+s+" ", " followup 0*([1-9][0-9]*) ")) { n=strtoreal(ustrregexs(1)); p.temporal=1; p.system="stage"; p.kval=(3,n); p.key="3:"+strofreal(n); }
-    else if (_vo_has(s," follow up ") | _vo_has(s," followup ")) { p.temporal=1; p.system="stage"; p.kval=(3,1); p.key="3:1"; }
-    else if (_vo_has(s," pre ")) { p.temporal=1; p.system="stage"; p.kval=(1,0); p.key="1:0"; }
-    else if (_vo_has(s," mid ")) { p.temporal=1; p.system="stage"; p.kval=(2,0); p.key="2:0"; }
-    else if (_vo_has(s," post ")) { p.temporal=1; p.system="stage"; p.kval=(3,0); p.key="3:0"; }
-    else if (_vo_has(s," before ")) { p.temporal=1; p.system="stage"; p.kval=(1,0); p.key="1:0"; }
-    else if (_vo_has(s," during ")) { p.temporal=1; p.system="stage"; p.kval=(2,0); p.key="2:0"; }
-    else if (_vo_has(s," discharge ")) { p.temporal=1; p.system="stage"; p.kval=(3,0); p.key="3:0"; }
-    else if (_vo_has(s," after ")) { p.temporal=1; p.system="stage"; p.kval=(3,0); p.key="3:0"; }
+    else if (strpos(" "+s+" "," follow up ") | strpos(" "+s+" "," followup ")) { p.temporal=1; p.system="stage"; p.kval=(3,1); p.key="3:1"; }
+    else if (strpos(" "+s+" "," pre ")) { p.temporal=1; p.system="stage"; p.kval=(1,0); p.key="1:0"; }
+    else if (strpos(" "+s+" "," mid ")) { p.temporal=1; p.system="stage"; p.kval=(2,0); p.key="2:0"; }
+    else if (strpos(" "+s+" "," post ")) { p.temporal=1; p.system="stage"; p.kval=(3,0); p.key="3:0"; }
+    else if (strpos(" "+s+" "," before ")) { p.temporal=1; p.system="stage"; p.kval=(1,0); p.key="1:0"; }
+    else if (strpos(" "+s+" "," during ")) { p.temporal=1; p.system="stage"; p.kval=(2,0); p.key="2:0"; }
+    else if (strpos(" "+s+" "," discharge ")) { p.temporal=1; p.system="stage"; p.kval=(3,0); p.key="3:0"; }
+    else if (strpos(" "+s+" "," after ")) { p.temporal=1; p.system="stage"; p.kval=(3,0); p.key="3:0"; }
 
     else if (ustrregexm(" "+s+" ", " ([12][0-9][0-9][0-9]) q 0*([1-4]) ")) {
         yr=strtoreal(ustrregexs(1)); q=strtoreal(ustrregexs(2)); p.temporal=1; p.system="year_quarter"; p.kval=(yr,q); p.key=strofreal(yr)+":"+strofreal(q)
@@ -673,6 +707,7 @@ struct vo_v2graph {
 string scalar _v2_phrase(string scalar raw)
 {
     string scalar s
+    if(strlen(raw)==ustrlen(raw)) return(stritrim(strtrim(subinstr(strlower(raw),"_"," ",.))))
     s=ustrlower(ustrtrim(raw))
     s=ustrregexra(s,"_+"," ")
     s=ustrregexra(s,"[ ]+"," ")
@@ -719,13 +754,19 @@ real scalar _v2_month(string scalar raw)
     return(.)
 }
 
-struct vo_v2date scalar _v2_date(string scalar raw)
+struct vo_v2date scalar _v2_date(string scalar raw, string scalar n)
 {
     struct vo_v2date scalar d
-    string scalar s,n,conv
+    string scalar s,conv
     real scalar a,b,y,m,day
     d.found=0; d.valid=0; d.ambiguous=0; d.ymd=J(1,0,.); d.rule=""
-    s=ustrlower(ustrtrim(raw)); n=_vo_norm(raw); conv=""
+    s=ustrlower(ustrtrim(raw)); conv=""
+    if(!ustrregexm(s,"[0-9]")) return(d)
+    if(!strpos(s,"-") & !strpos(s,"/") & !strpos(s,"_") &
+       !strpos(s,"date") & !strpos(s,"ymd") & !strpos(s,"dmy") & !strpos(s,"mdy") &
+       !strpos(s,"jan") & !strpos(s,"feb") & !strpos(s,"mar") & !strpos(s,"apr") &
+       !strpos(s,"may") & !strpos(s,"jun") & !strpos(s,"jul") & !strpos(s,"aug") &
+       !strpos(s,"sep") & !strpos(s,"oct") & !strpos(s,"nov") & !strpos(s,"dec")) return(d)
     if(ustrregexm(" "+n+" "," (date convention )?dmy ") | strpos(" "+n+" "," day month year ")) conv="dmy"
     if(ustrregexm(" "+n+" "," (date convention )?mdy ") | strpos(" "+n+" "," month day year ")) {
         if(conv!="" & conv!="mdy") { d.found=1; d.ambiguous=1; d.rule="conflicting_date_convention"; return(d); }
@@ -769,36 +810,36 @@ struct vo_v2date scalar _v2_date(string scalar raw)
     return(d)
 }
 
-string scalar _v2_construct(string scalar raw, struct vo_v2parse scalar p, string scalar source)
+string scalar _v2_construct(string scalar raw, string scalar s, struct vo_v2parse scalar p, string scalar source)
 {
-    string scalar s,prefix
-    string rowvector t,keep,drop
+    external string rowvector VARORDER_V2_DROP_TOKENS
+    string scalar prefix,padded
+    string rowvector t,keep
     real scalar i
-    s=_vo_norm(raw)
     if(s=="") return("")
-    if(ustrregexm(" "+s+" "," randomized ([[:alpha:]]+ )*arm ")) return("")
-    if(ustrregexm(s,"^(.+?) construct( |$)")) {
+    padded=" "+s+" "
+    if(strpos(padded," randomized ") & strpos(padded," arm ") & ustrregexm(padded," randomized ([[:alpha:]]+ )*arm ")) return("")
+    if(strpos(padded," construct ") & ustrregexm(s,"^(.+?) construct( |$)")) {
         prefix=ustrtrim(ustrregexs(1))
         prefix=ustrregexra(prefix," (response|responses|status|domain|measure|measurement|score)$","")
         return(prefix)
     }
-    if(ustrregexm(s,"^(.+?) (temporal hierarchy|time order|temporal order|occasion order|measurement order|stage order|phase order|assessment sequence|measurement sequence|stage sequence|phase sequence)( |$)")) {
+    if((strpos(padded," temporal hierarchy ") | strpos(padded," time order ") | strpos(padded," temporal order ") | strpos(padded," occasion order ") | strpos(padded," measurement order ") | strpos(padded," stage order ") | strpos(padded," phase order ") | strpos(padded," assessment sequence ") | strpos(padded," measurement sequence ") | strpos(padded," stage sequence ") | strpos(padded," phase sequence ")) & ustrregexm(s,"^(.+?) (temporal hierarchy|time order|temporal order|occasion order|measurement order|stage order|phase order|assessment sequence|measurement sequence|stage sequence|phase sequence)( |$)")) {
         prefix=ustrtrim(ustrregexs(1)); prefix=ustrregexra(prefix," construct$",""); return(prefix)
     }
-    if(source!="name" & p.schema=="time" & ustrregexm(" "+s+" "," score time ") & ustrregexm(s,"^(.+ time) 0*[1-9][0-9]*$")) {
+    if(source!="name" & p.schema=="time" & strpos(padded," score time ") & ustrregexm(s,"^(.+ time) 0*[1-9][0-9]*$")) {
         prefix=" "+ustrtrim(ustrregexs(1))+" "
         prefix=ustrregexra(prefix," (score|scores|measure|measures|measurement|measurements|assessment|assessments|outcome|outcomes) "," ")
         return(ustrtrim(ustrregexra(prefix,"[ ]+"," ")))
     }
-    if(substr(p.schema,1,9)=="relative_") {
+    if(substr(p.schema,1,9)=="relative_" & (strpos(padded," hour ") | strpos(padded," hours ") | strpos(padded," day ") | strpos(padded," days ") | strpos(padded," week ") | strpos(padded," weeks ")) & strpos(padded," relative to ")) {
         if(ustrregexm(s,"^(.+?) (hour|hours|day|days|week|weeks) [+-]?[0-9]+ relative to ")) return(ustrtrim(ustrregexs(1)))
     }
     if(source=="name" & !(p.temporal | p.negative | p.unresolved | p.invalid | p.schema=="date" | p.schema=="bare_numeric" | p.schema=="quarter_candidate")) return("")
     t=tokens(s); keep=J(1,0,"")
-    drop=("a","id","score","scores","measure","measures","measurement","measurements","repeated","assessment","assessments","outcome","outcomes","calendar","year","quarter","month","date","convention","dmy","mdy","ymd","day","days","hour","hours","week","weeks","relative","to","at","then","related","fiscal","fy","grade","academic","term","semester","developmental","within","period","cycle","visit","time","wave","t","q","m","g","pre","mid","post","pretest","posttest","baseline","screening","discharge","followup","follow","up","before","during","after","treatment","current","stage","phase","occasion","unknown","unspecified","construct","hierarchy","order","sequence","questionnaire","item","form","batch","identifier","not","temporal","january","jan","february","feb","march","mar","april","apr","may","june","jun","july","jul","august","aug","september","sept","sep","october","oct","november","nov","december","dec","fall","spring","morning","afternoon","evening")
     for(i=1;i<=cols(t);i++) {
-        if(anyof(drop,t[i])) continue
-        if(ustrregexm(t[i],"^[+-]?[0-9]+$")) continue
+        if(anyof(VARORDER_V2_DROP_TOKENS,t[i])) continue
+        if(_vo_numeric_token(t[i])) continue
         keep=keep,t[i]
     }
     if(cols(keep)==0) return("")
@@ -806,29 +847,424 @@ string scalar _v2_construct(string scalar raw, struct vo_v2parse scalar p, strin
     return(invtokens(keep))
 }
 
-struct vo_v2parse scalar _v2_parse(string scalar raw, string scalar source)
+real scalar _v2_reserved_token(string rowvector t)
+{
+    external string rowvector VARORDER_V2_RESERVED_TOKENS
+    real scalar i
+    for(i=1;i<=cols(t);i++) if(anyof(VARORDER_V2_RESERVED_TOKENS,t[i])) return(1)
+    return(0)
+}
+
+real scalar _v2_opaque_name(string scalar norm)
+{
+    string rowvector t
+    t=tokens(norm)
+    if(cols(t)!=2) return(0)
+    return(anyof(("v","var","x","item","q","u","p","r","k","n","c","d","h","b","w"),t[1]) & _vo_numeric_token(t[2]))
+}
+
+string scalar _v2_fast_family(string scalar raw, string scalar norm, struct vo_v2parse scalar p, string scalar source)
+{
+    string scalar family
+    family=_v2_construct(raw,norm,p,source)
+    if(source=="name" & family=="") family=_vo_clean_family(norm,0)
+    return(family)
+}
+
+struct vo_v2parse scalar _v2_fast_parse(string scalar raw, string scalar source, string scalar norm, real scalar handled)
+{
+    struct vo_v2parse scalar p
+    string rowvector t,u,rt,rpad
+    string scalar marker,last,basekey,phrase,unit,ref,padded,piece,cue,clause,cur,left,right,numtext,ch
+    real scalar i,jj,n,nnum,L,yr,q,mo,day,first,second,stagecount,stagepos,Lr,relcount,relpos,at,endat,nodeat
+    p.family=""; p.schema=""; p.key="."; p.skey=""; p.reason=""; p.reference=""; p.hierarchy=""; p.node=""; p.evidence=source; p.temporal=0; p.negative=0; p.invalid=0; p.unresolved=0; p.kval=J(1,0,.); p.relfrom=p.relto=J(1,0,"")
+    handled=0
+    if(norm=="") { handled=1; return(p); }
+    t=tokens(norm); L=cols(t); u=J(1,5,""),t; padded=" "+norm+" "; nnum=0
+    for(i=1;i<=cols(t);i++) if(_vo_numeric_token(t[i])) nnum++
+    if(nnum==0 & !_v2_reserved_token(t)) {
+        p.family=_v2_construct(raw,norm,p,source); handled=1; return(p)
+    }
+    if(nnum==0 & (strpos(padded," not temporal ") | strpos(padded," not time ") | strpos(padded," questionnaire item ") | strpos(padded," assessment form ") | strpos(padded," batch identifier ") | strpos(padded," batch id "))) {
+        if(source!="notes" | !(strpos(raw,"<") | strpos(padded," before ") | strpos(padded," precedes ") | strpos(padded," after ") | strpos(padded," follows "))) {
+            p.negative=1; p.family=_v2_construct(raw,norm,p,source); handled=1; return(p)
+        }
+    }
+    if(source=="label") {
+    if(nnum==1 & L>=3 & _vo_numeric_token(u[L+5]) & ((u[L+3]=="questionnaire" & u[L+4]=="item") | (u[L+3]=="assessment" & u[L+4]=="form"))) {
+        n=strtoreal(u[L+5]); p.negative=1; p.schema="related"; p.key=strofreal(n); p.kval=n; p.family=_v2_construct(raw,norm,p,source); handled=1; return(p)
+    }
+    if(nnum==1 & L>=3 & _vo_numeric_token(u[L+5]) & u[L+3]=="batch" & anyof(("id","identifier"),u[L+4])) {
+        p.negative=1; p.family=_v2_construct(raw,norm,p,source); handled=1; return(p)
+    }
+    if(L>=3 & _vo_numeric_token(t[L]) & strtoreal(t[L])>=1000 & strtoreal(t[L])<=2999 & strpos(padded," date ")) {
+        yr=strtoreal(t[L]); mo=.; day=.
+        if(_vo_numeric_token(t[L-1])) { mo=_v2_month(t[L-2]); day=strtoreal(t[L-1]); }
+        else if(_vo_numeric_token(t[L-2])) { mo=_v2_month(t[L-1]); day=strtoreal(t[L-2]); }
+        if(mo<. & day<.) {
+            p.schema="date"; p.kval=(yr,mo,day); p.key=strofreal(yr)+":"+strofreal(mo)+":"+strofreal(day)
+            p.temporal=_vo_valid_calendar_date(yr,mo,day); p.invalid=!p.temporal; p.reason=(p.invalid ? "invalid_temporal_value" : "")
+            if(p.temporal) p.skey=_vo_sort_key(p.kval)
+            p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+        }
+    }
+    if(L>=3) {
+        if(_vo_numeric_token(t[L-2]) & _vo_numeric_token(t[L-1]) & _vo_numeric_token(t[L]) & strpos(padded," date ") & !strpos(raw,"-") & !strpos(padded," dmy ") & !strpos(padded," mdy ")) {
+            first=strtoreal(t[L-2]); second=strtoreal(t[L-1]); yr=strtoreal(t[L])
+            if((strlen(t[L])==2) | (strlen(t[L])==4 & yr>=1000 & yr<=2999 & !((first>=13 & first<=31 & second>=1 & second<=12) | (second>=13 & second<=31 & first>=1 & first<=12)))) {
+                p.schema="date"; p.unresolved=1; p.reason="temporal_unverified"; p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+            }
+        }
+    }
+    if(strlen(raw)==ustrlen(raw) & strlen(raw)>=10 & !strpos(padded," not ") & !strpos(padded," questionnaire ") & !strpos(padded," batch ") & !strpos(padded," barcode ")) {
+        for(first=1;first<=strlen(raw)-9;first++) {
+            piece=substr(raw,first,10)
+            if(substr(piece,5,1)=="-" & substr(piece,8,1)=="-" & _vo_numeric_token(substr(piece,1,4)) & _vo_numeric_token(substr(piece,6,2)) & _vo_numeric_token(substr(piece,9,2))) {
+                if(first>1) if(_vo_numeric_token(substr(raw,first-1,1))) continue
+                if(first+9<strlen(raw)) if(_vo_numeric_token(substr(raw,first+10,1))) continue
+                yr=strtoreal(substr(piece,1,4)); mo=strtoreal(substr(piece,6,2)); day=strtoreal(substr(piece,9,2))
+                p.schema="date"; p.kval=(yr,mo,day); p.key=strofreal(yr)+":"+strofreal(mo)+":"+strofreal(day)
+                p.temporal=_vo_valid_calendar_date(yr,mo,day); p.invalid=!p.temporal; p.reason=(p.invalid ? "invalid_temporal_value" : "")
+                if(p.temporal) p.skey=_vo_sort_key(p.kval)
+                p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+            }
+        }
+    }
+    }
+    if(source=="name") {
+    if(L==2) {
+        if(t[1]=="q" & _vo_numeric_token(t[2])) {
+            n=strtoreal(t[2]); p.schema="related"; p.key=strofreal(n); handled=1; return(p)
+        }
+    }
+    if(L>=3) {
+        if(L==3 & nnum==1 & _vo_numeric_token(t[2]) & strlen(t[2])==4 & strtoreal(t[2])>=1000 & strtoreal(t[2])<=2999 & !_v2_reserved_token((t[1],t[3]))) {
+            yr=strtoreal(t[2]); p.schema="year"; p.key=strofreal(yr); p.kval=yr; p.skey=_vo_sort_key(yr); p.temporal=1; p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+        }
+        if(nnum==1 & anyof(("q","quarter"),t[L-1]) & _vo_numeric_token(t[L])) {
+            n=strtoreal(t[L]); p.schema="quarter"; p.key=strofreal(n); handled=1; return(p)
+        }
+        if(L>=4 & t[L-2]=="d" & _vo_numeric_token(t[L-1]) & anyof(("morning","afternoon","evening"),t[L])) {
+            p.schema="related"; handled=1; return(p)
+        }
+        if(L==3 & _vo_numeric_token(t[2]) & _vo_numeric_token(t[3]) & !_v2_reserved_token(t[1])) {
+            p.schema="unresolved_unknown_hierarchy"; p.key=strofreal(strtoreal(t[2]))+":"+strofreal(strtoreal(t[3])); p.kval=(strtoreal(t[2]),strtoreal(t[3])); p.unresolved=1; p.reason="hierarchy_ambiguous"; p.family=_vo_clean_family(norm,0); handled=1; return(p)
+        }
+    }
+    if(nnum==0 & L>=2 & anyof(("day","hour","week"),t[L])) {
+        p.schema="related"; handled=1; return(p)
+    }
+    }
+    if(source!="name") {
+    if(L>=2) {
+        if(!(nnum==1 & t[L-1]=="t" & _vo_numeric_token(t[L]))) {
+            relcount=0; relpos=.
+            for(i=1;i<L;i++) if(t[i]=="t" & _vo_numeric_token(t[i+1])) { relcount++; relpos=i; }
+            if(relcount==1) {
+                n=strtoreal(t[relpos+1]); p.schema="t"; p.key=strofreal(n); p.kval=n; p.skey=_vo_sort_key(n); p.temporal=(n>=1); p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+            }
+        }
+    }
+    }
+    if(source=="notes") {
+    if(L>=3) {
+        if(strpos(padded," date convention mdy ") & strpos(padded," measurement date ")) {
+            if(strpos(padded," date convention dmy ")) {
+                p.schema="date"; p.unresolved=1; p.reason="temporal_unverified"; p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+            }
+            if(_vo_numeric_token(t[L-2]) & _vo_numeric_token(t[L-1]) & _vo_numeric_token(t[L])) {
+                mo=strtoreal(t[L-2]); day=strtoreal(t[L-1]); yr=strtoreal(t[L])
+                p.schema="date"; p.kval=(yr,mo,day); p.key=strofreal(yr)+":"+strofreal(mo)+":"+strofreal(day)
+                p.temporal=_vo_valid_calendar_date(yr,mo,day); p.invalid=!p.temporal; p.reason=(p.invalid ? "invalid_temporal_value" : "")
+                if(p.temporal) p.skey=_vo_sort_key(p.kval)
+                p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+            }
+        }
+    }
+    if(strpos(padded," not time ") | strpos(padded," not temporal ") | strpos(padded," not a calendar time ") | strpos(padded," not documented as time ")) {
+        if(strpos(raw,"<") | strpos(padded," before ") | strpos(padded," precedes ") | strpos(padded," after ") | strpos(padded," follows ")) return(p)
+        p.negative=1; p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+    }
+    if(strpos(padded," measurement occasion unspecified ") | strpos(padded," measurement occasion unknown ")) {
+        p.schema="related"; p.unresolved=1; p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+    }
+    }
+    if(L>=2 & nnum==1 & _vo_numeric_token(t[L])) {
+        last=t[L]; n=strtoreal(last); marker=t[L-1]
+        if(anyof(("t","time","wave","visit"),marker) & n>=1) {
+            p.schema=marker; p.key=strofreal(n); p.kval=n; p.skey=_vo_sort_key(n); p.temporal=1
+            p.family=_v2_construct(raw,norm,p,source); handled=1; return(p)
+        }
+        if(source=="name" & L==2 & marker=="g" & strlen(last)==4 & n>=1000 & n<=2999) {
+            p.schema="year"; p.key=strofreal(n); p.kval=n; p.skey=_vo_sort_key(n); p.temporal=1; handled=1; return(p)
+        }
+        if(strlen(last)==4 & n>=1000 & n<=2999 & !_v2_reserved_token(t[|1\L-1|])) {
+            p.schema="year"; p.key=strofreal(n); p.kval=n; p.skey=_vo_sort_key(n); p.temporal=1
+            p.family=_v2_construct(raw,norm,p,source); handled=1; return(p)
+        }
+        if(!_v2_reserved_token(t[|1\L-1|])) {
+            basekey=last
+            while(strlen(basekey)>1 & substr(basekey,1,1)=="0") basekey=substr(basekey,2,.)
+            p.schema="related"; p.key=basekey; p.family=_vo_clean_family(norm,0); handled=1; return(p)
+        }
+    }
+    if(source=="notes" & !strpos(raw,">") & (strpos(padded," hierarchy grade term ") | strpos(padded," hierarchy grade then term "))) {
+        for(i=1;i<=L-2;i++) if(t[i]=="grade" & _vo_numeric_token(t[i+1]) & anyof(("fall","spring"),t[i+2])) {
+            first=strtoreal(t[i+1])
+            if(first>=1) {
+                second=(t[i+2]=="fall" ? 1 : 2); p.schema="grade_term"; p.kval=(first,second); p.key=invtokens(strofreal(p.kval),":"); p.skey=_vo_sort_key(p.kval); p.temporal=1; p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+            }
+        }
+    }
+    if(source=="notes" & !strpos(raw,">") & (strpos(padded," hierarchy day period ") | strpos(padded," hierarchy day then period "))) {
+        for(i=1;i<=L-2;i++) if(t[i]=="day" & _vo_numeric_token(t[i+1]) & anyof(("morning","afternoon","evening"),t[i+2])) {
+            first=strtoreal(t[i+1]); second=1+(t[i+2]=="afternoon")+2*(t[i+2]=="evening")
+            if(first>=1) {
+                p.schema="day_period"; p.kval=(first,second); p.key=invtokens(strofreal(p.kval),":"); p.skey=_vo_sort_key(p.kval); p.temporal=1; p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+            }
+        }
+    }
+    if(source=="notes" & !strpos(raw,">") & (strpos(padded," hierarchy year quarter ") | strpos(padded," hierarchy year then quarter "))) {
+        for(i=1;i<=L-3;i++) if(t[i]=="year" & _vo_numeric_token(t[i+1]) & anyof(("q","quarter"),t[i+2]) & _vo_numeric_token(t[i+3])) {
+            yr=strtoreal(t[i+1]); q=strtoreal(t[i+3])
+            if(yr>=1000 & yr<=2999 & q>=1 & q<=4) {
+                p.schema="year_quarter"; p.kval=(yr,q); p.key=invtokens(strofreal(p.kval),":"); p.skey=_vo_sort_key(p.kval); p.temporal=1; p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+            }
+        }
+    }
+    if(source=="notes" & strpos(raw,">") & strpos(padded," temporal hierarchy ")) {
+        phrase=_v2_phrase(raw); cue="temporal hierarchy:"; at=strpos(phrase,cue)
+        if(at>0) {
+            clause=substr(phrase,at+strlen(cue),.); endat=strpos(clause,".")
+            if(endat>0) clause=substr(clause,1,endat-1)
+            rt=_v2_split(clause,">"); p.hierarchy=""; p.kval=J(1,0,.); relcount=0
+            basekey=subinstr(subinstr(phrase," =","=",.),"= ","=",.)
+            for(i=1;i<=cols(rt);i++) {
+                cur=_v2_endpoint(rt[i])
+                if(cur=="" | anyof(_v2_split(p.hierarchy,">"),cur)) continue
+                at=strpos(" "+basekey," "+cur+"=")
+                if(at==0) continue
+                piece=substr(" "+basekey,at+strlen(" "+cur+"="),.); numtext=""
+                for(jj=1;jj<=strlen(piece);jj++) {
+                    ch=substr(piece,jj,1)
+                    if(jj==1 & anyof(("+","-"),ch)) numtext=numtext+ch
+                    else if(_vo_numeric_token(ch)) numtext=numtext+ch
+                    else break
+                }
+                if(numtext=="" | numtext=="+" | numtext=="-" | !_vo_numeric_token(numtext)) continue
+                p.hierarchy=(p.hierarchy=="" ? cur : p.hierarchy+">"+cur); p.kval=p.kval,strtoreal(numtext); relcount++
+            }
+            if(cols(rt)>=2 & relcount==cols(rt)) {
+                p.schema="hierarchy"; p.temporal=1; p.key=invtokens(strofreal(p.kval),":"); p.skey=_vo_sort_key(p.kval); p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+            }
+        }
+    }
+    if(source=="notes" & strpos(raw,"<")) {
+        phrase=_v2_phrase(raw); cue=""
+        if(strpos(phrase,"stage order:")) cue="stage order:"
+        else if(strpos(phrase,"phase order:")) cue="phase order:"
+        else if(strpos(phrase,"time order:")) cue="time order:"
+        else if(strpos(phrase,"temporal order:")) cue="temporal order:"
+        else if(strpos(phrase,"occasion order:")) cue="occasion order:"
+        else if(strpos(phrase,"measurement order:")) cue="measurement order:"
+        else if(strpos(phrase,"phase sequence:")) cue="phase sequence:"
+        else if(strpos(phrase,"stage sequence:")) cue="stage sequence:"
+        else if(strpos(phrase,"assessment sequence:")) cue="assessment sequence:"
+        else if(strpos(phrase,"measurement sequence:")) cue="measurement sequence:"
+        if(cue!="" & strpos(phrase,"current stage:")) {
+            at=strpos(phrase,cue); clause=substr(phrase,at+strlen(cue),.); endat=strpos(clause,".")
+            if(endat>0) clause=substr(clause,1,endat-1)
+            rt=_v2_split(clause,"<"); p.relfrom=p.relto=J(1,0,"")
+            for(i=1;i<cols(rt);i++) {
+                left=_v2_endpoint(rt[i]); right=_v2_endpoint(rt[i+1])
+                if(left!="" & right!="" & left!=right) { p.relfrom=p.relfrom,left; p.relto=p.relto,right; }
+            }
+            nodeat=strpos(phrase,"current stage:"); cur=substr(phrase,nodeat+strlen("current stage:"),.); endat=strpos(cur,".")
+            if(endat>0) cur=substr(cur,1,endat-1)
+            p.node=_v2_endpoint(cur)
+            if(p.node!="" & cols(p.relfrom)>0) {
+                p.schema="relation"; p.temporal=1; p.key=p.node; p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+            }
+        }
+    }
+    if(source=="notes" & strpos(padded," before ")) {
+        phrase=_v2_phrase(raw); cue=""
+        if(strpos(phrase,"phase sequence:")) cue="phase sequence:"
+        else if(strpos(phrase,"stage sequence:")) cue="stage sequence:"
+        else if(strpos(phrase,"assessment sequence:")) cue="assessment sequence:"
+        else if(strpos(phrase,"measurement sequence:")) cue="measurement sequence:"
+        else if(strpos(phrase,"sequence:")) cue="sequence:"
+        if(cue!="" & strpos(phrase,"current stage:")) {
+            at=strpos(phrase,cue); clause=substr(phrase,at+strlen(cue),.); endat=strpos(clause,".")
+            if(endat>0) clause=substr(clause,1,endat-1)
+            rt=_v2_split(clause,";"); p.relfrom=p.relto=J(1,0,""); relcount=0
+            for(i=1;i<=cols(rt);i++) {
+                at=strpos(rt[i]," before ")
+                if(at>0) {
+                    left=_v2_endpoint(substr(rt[i],1,at-1)); right=_v2_endpoint(substr(rt[i],at+strlen(" before "),.))
+                    if(left!="" & right!="" & left!=right) { p.relfrom=p.relfrom,left; p.relto=p.relto,right; relcount++; }
+                }
+            }
+            nodeat=strpos(phrase,"current stage:"); cur=substr(phrase,nodeat+strlen("current stage:"),.); endat=strpos(cur,".")
+            if(endat>0) cur=substr(cur,1,endat-1)
+            p.node=_v2_endpoint(cur)
+            if(p.node!="" & cols(p.relfrom)>0 & relcount==cols(rt)) {
+                p.schema="relation"; p.temporal=1; p.key=p.node; p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+            }
+        }
+    }
+    if(source!="notes") {
+    if(source=="name" & L>=6) {
+        if(t[L-5]=="fy" & _vo_numeric_token(t[L-4]) & anyof(("q","quarter"),t[L-3]) & _vo_numeric_token(t[L-2]) & anyof(("m","month"),t[L-1]) & _vo_numeric_token(t[L])) {
+            yr=strtoreal(t[L-4]); q=strtoreal(t[L-2]); mo=strtoreal(t[L])
+            p.schema="unresolved_fiscal_hierarchy_unsupported"; p.kval=(yr,q,mo); p.key=invtokens(strofreal(p.kval),":"); p.unresolved=1; p.reason="hierarchy_ambiguous"; p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+        }
+    }
+    if(L>=5 & _vo_numeric_token(u[L+1]) & anyof(("q","quarter"),u[L+2]) & _vo_numeric_token(u[L+3]) & anyof(("m","month"),u[L+4]) & _vo_numeric_token(u[L+5])) {
+        yr=strtoreal(u[L+1]); q=strtoreal(u[L+3]); mo=strtoreal(u[L+5])
+        if(yr>=1000 & yr<=2999 & q>=1 & q<=4 & mo>=1 & mo<=12 & _vo_month_matches_quarter(q,mo) & !anyof(t,"fy") & !anyof(t,"fiscal")) {
+            p.schema="year_quarter_month"; p.kval=(yr,q,mo); p.key=invtokens(strofreal(p.kval),":"); p.skey=_vo_sort_key(p.kval); p.temporal=1; p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+        }
+        if(source=="name" & yr>=1000 & yr<=2999 & q>=1 & q<=4 & mo>=1 & mo<=12 & !anyof(t,"fy") & !anyof(t,"fiscal")) {
+            p.schema="unresolved_year_quarter_month"; p.kval=(yr,q,mo); p.key=invtokens(strofreal(p.kval),":"); p.unresolved=1; p.reason="hierarchy_ambiguous"; p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+        }
+    }
+    if(L>=4 & u[L+2]=="fy" & _vo_numeric_token(u[L+3]) & anyof(("q","quarter"),u[L+4]) & _vo_numeric_token(u[L+5])) {
+        yr=strtoreal(u[L+3]); q=strtoreal(u[L+5])
+        if(yr>=1000 & yr<=2999 & q>=1 & q<=4) {
+            p.schema="fiscal_year_quarter"; p.kval=(yr,q); p.key=invtokens(strofreal(p.kval),":"); p.skey=_vo_sort_key(p.kval); p.temporal=1; p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+        }
+    }
+    if(L>=4 & u[L+2]=="cycle" & _vo_numeric_token(u[L+3]) & u[L+4]=="visit" & _vo_numeric_token(u[L+5])) {
+        first=strtoreal(u[L+3]); second=strtoreal(u[L+5])
+        if(first>=1 & second>=1) {
+            p.schema="cycle_visit"; p.kval=(first,second); p.key=invtokens(strofreal(p.kval),":"); p.skey=_vo_sort_key(p.kval); p.temporal=1; p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+        }
+    }
+    if(L>=3 & anyof(("g","grade"),u[L+3]) & _vo_numeric_token(u[L+4]) & anyof(("fall","spring"),u[L+5])) {
+        first=strtoreal(u[L+4])
+        if(first>=1) {
+            second=(u[L+5]=="fall" ? 1 : 2); p.schema="grade_term"; p.kval=(first,second); p.key=invtokens(strofreal(p.kval),":"); p.skey=_vo_sort_key(p.kval); p.temporal=1; p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+        }
+    }
+    if(L>=3 & _vo_numeric_token(u[L+3]) & u[L+4]=="m" & _vo_numeric_token(u[L+5])) {
+        yr=strtoreal(u[L+3]); mo=strtoreal(u[L+5])
+        if(yr>=1000 & yr<=2999 & mo>=1 & mo<=12) {
+            p.schema="calendar_month"; p.kval=(yr,mo); p.key=invtokens(strofreal(p.kval),":"); p.skey=_vo_sort_key(p.kval); p.temporal=1; p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+        }
+    }
+    if(L>=3 & _vo_numeric_token(u[L+3]) & anyof(("q","quarter"),u[L+4]) & _vo_numeric_token(u[L+5])) {
+        yr=strtoreal(u[L+3]); q=strtoreal(u[L+5])
+        if(yr>=1000 & yr<=2999 & q>=1 & q<=4) {
+            p.schema="year_quarter"; p.kval=(yr,q); p.key=invtokens(strofreal(p.kval),":"); p.skey=_vo_sort_key(p.kval); p.temporal=1; p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+        }
+    }
+    }
+    if(source=="label") {
+    if(L>=5 & u[L+1]=="academic" & u[L+2]=="year" & _vo_numeric_token(u[L+3]) & anyof(("term","semester"),u[L+4]) & _vo_numeric_token(u[L+5])) {
+        yr=strtoreal(u[L+3]); second=strtoreal(u[L+5])
+        if(yr>=1000 & yr<=2999 & second>=1) {
+            p.schema="academic_year_term"; p.kval=(yr,second); p.key=invtokens(strofreal(p.kval),":"); p.skey=_vo_sort_key(p.kval); p.temporal=1; p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+        }
+    }
+    if(L>=3 & u[L+3]=="day" & _vo_numeric_token(u[L+4]) & anyof(("morning","afternoon","evening"),u[L+5])) {
+        first=strtoreal(u[L+4]); second=1+(u[L+5]=="afternoon")+2*(u[L+5]=="evening")
+        if(first>=1) {
+            p.schema="day_period"; p.kval=(first,second); p.key=invtokens(strofreal(p.kval),":"); p.skey=_vo_sort_key(p.kval); p.temporal=1; p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+        }
+    }
+    if(L>=2 & nnum==1 & anyof(("q","quarter"),u[L+4]) & _vo_numeric_token(u[L+5])) {
+        q=strtoreal(u[L+5])
+        if(q>=1 & q<=4) {
+            p.schema="quarter"; p.kval=q; p.key=strofreal(q); p.skey=_vo_sort_key(q); p.temporal=1; p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+        }
+    }
+    if(L>=2 & nnum==1 & u[L+4]=="year" & _vo_numeric_token(u[L+5])) {
+        yr=strtoreal(u[L+5])
+        if(yr>=1000 & yr<=2999) {
+            p.schema="year"; p.kval=yr; p.key=strofreal(yr); p.skey=_vo_sort_key(yr); p.temporal=1; p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+        }
+    }
+    }
+    stagecount=0; marker=""; stagepos=.
+    if((strpos(padded," screening ") | strpos(padded," pretest ") | strpos(padded," posttest ") | strpos(padded," baseline ") | strpos(padded," followup ") | strpos(padded," follow ") | strpos(padded," pre ") | strpos(padded," mid ") | strpos(padded," post ") | strpos(padded," before ") | strpos(padded," during ") | strpos(padded," discharge ") | strpos(padded," after ")) & !strpos(padded," order ") & !strpos(padded," sequence ") & !strpos(padded," hierarchy ") & !strpos(padded," relative ") & !strpos(padded," unknown ") & !strpos(padded," unspecified ") & !strpos(padded," not ") & !strpos(padded," questionnaire ") & !strpos(padded," batch ") & !strpos(padded," date ")) {
+        for(i=1;i<=L;i++) if(anyof(("screening","pretest","posttest","baseline","followup","follow","pre","mid","post","before","during","discharge","after"),t[i])) {
+            stagecount++; marker=t[i]; stagepos=i
+        }
+    }
+    if(stagecount==1) {
+        p.schema="stage"; p.temporal=1
+        if(marker=="screening") p.kval=(0,0)
+        else if(anyof(("pretest","baseline","pre","before"),marker)) p.kval=(1,0)
+        else if(marker=="mid" | marker=="during") p.kval=(2,0)
+        else if(marker=="followup" | marker=="follow") {
+            n=1
+            if(stagepos<L) {
+                if(_vo_numeric_token(t[stagepos+1])) n=strtoreal(t[stagepos+1])
+                else if(stagepos+1<L) if(t[stagepos+1]=="up" & _vo_numeric_token(t[stagepos+2])) n=strtoreal(t[stagepos+2])
+            }
+            p.kval=(3,n)
+        }
+        else p.kval=(3,0)
+        p.key=invtokens(strofreal(p.kval),":"); p.skey=_vo_sort_key(p.kval); p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+    }
+    if(source=="notes" & !strpos(padded," relative ") & !strpos(padded," order ") & !strpos(padded," sequence ") & !strpos(padded," hierarchy ") & !strpos(padded," unknown ") & !strpos(padded," unspecified ") & !strpos(padded," not ")) {
+        phrase=_v2_phrase(raw); rt=tokens(phrase); Lr=cols(rt); rpad=rt,J(1,3,""); relcount=0; relpos=.
+        for(i=1;i<=Lr;i++) if(rt[i]=="at" & anyof(("hour","hours","day","days","week","weeks"),rpad[i+1]) & _vo_numeric_token(rpad[i+2])) {
+            relcount++; relpos=i
+        }
+        if(relcount==1 & relpos+2==Lr) {
+            unit=rt[relpos+1]
+            if(substr(unit,1,4)=="hour") unit="hour"
+            else if(substr(unit,1,3)=="day") unit="day"
+            else unit="week"
+            n=strtoreal(rt[relpos+2]); p.schema="relative_"+unit; p.kval=n; p.key=strofreal(n); p.skey=_vo_sort_key(n); p.temporal=1; p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+        }
+    }
+    if(strpos(padded," relative ")) {
+        phrase=_v2_phrase(raw); rt=tokens(phrase); Lr=cols(rt); rpad=rt,J(1,4,""); relcount=0; relpos=.
+        for(i=1;i<=Lr;i++) if(anyof(("hour","hours","day","days","week","weeks"),rt[i]) & _vo_numeric_token(rpad[i+1]) & rpad[i+2]=="relative" & rpad[i+3]=="to") {
+            relcount++; relpos=i
+        }
+        if(relcount==1 & relpos+3<Lr) {
+            ref=invtokens(rt[|relpos+4\Lr|])
+            if(ref!="" & !anyof(("unknown","unspecified"),ref) & !strpos(" "+ref+" "," or ") & !strpos(ref,"/")) {
+                unit=rt[relpos]
+                if(substr(unit,1,4)=="hour") unit="hour"
+                else if(substr(unit,1,3)=="day") unit="day"
+                else unit="week"
+                n=strtoreal(rt[relpos+1]); p.schema="relative_"+unit; p.kval=n; p.key=strofreal(n); p.skey=_vo_sort_key(n); p.reference=_v2_endpoint(ref); p.temporal=(p.reference!=""); p.unresolved=(p.reference==""); p.reason=(p.unresolved ? "ambiguous_reference_event" : ""); p.family=_v2_fast_family(raw,norm,p,source); handled=1; return(p)
+            }
+        }
+    }
+    return(p)
+}
+
+struct vo_v2parse scalar _v2_parse_norm(string scalar raw, string scalar source, string scalar norm)
 {
     struct vo_v2parse scalar p
     struct vo_parse scalar b
     struct vo_v2date scalar d
     string scalar s,clause,cur,one,left,right,unit
     string rowvector pieces,chain
-    real scalar i,n
+    real scalar i,n,handled
     p.family=""; p.schema=""; p.key="."; p.skey=""; p.reason=""; p.reference=""; p.hierarchy=""; p.node=""; p.evidence=""; p.temporal=0; p.negative=0; p.invalid=0; p.unresolved=0; p.kval=J(1,0,.); p.relfrom=p.relto=J(1,0,"")
     if(ustrtrim(raw)=="") return(p)
-    b=_vo_parse_source(raw)
+    p=_v2_fast_parse(raw,source,norm,handled)
+    if(handled) return(p)
+    b=_vo_parse_source(raw,norm)
     p.schema=(anyof(("t","time","wave","visit","index"),b.system) | substr(b.system,1,9)=="relative_" ? b.system : _vo_schema(b.system)); p.key=b.key; p.reason=b.reason; p.temporal=b.temporal; p.negative=b.negative; p.unresolved=b.unresolved; p.invalid=(b.reason=="invalid_temporal_value"); p.kval=b.kval
     if(b.ambiguous & !p.invalid) { p.schema="unresolved_"+(b.system!="" ? _vo_schema(b.system) : "hierarchy"); p.unresolved=1; p.reason=(b.reason!="" ? b.reason : "incomplete_temporal_structure"); }
     if(cols(p.kval)) p.skey=_vo_sort_key(p.kval)
     s=_v2_phrase(raw)
-    d=_v2_date(raw)
+    d=_v2_date(raw,norm)
     if(d.found) {
         p.schema="date"; p.temporal=d.valid; p.invalid=(d.found & !d.valid & !d.ambiguous); p.unresolved=d.ambiguous; p.reason=(p.invalid ? "invalid_temporal_value" : (p.unresolved ? "temporal_unverified" : "")); p.kval=d.ymd
         if(d.valid) { p.key=strofreal(d.ymd[1])+":"+strofreal(d.ymd[2])+":"+strofreal(d.ymd[3]); p.skey=_vo_sort_key(d.ymd); }
         else if(p.invalid & cols(d.ymd)==3) { p.key=strofreal(d.ymd[1])+":"+strofreal(d.ymd[2])+":"+strofreal(d.ymd[3]); p.skey=""; }
         else { p.key="."; p.skey=""; }
     }
-    if(ustrregexm(" "+s+" "," (hour|hours|day|days|week|weeks)[ ]*([+-]?[0-9]+)[ ]+relative[ ]+to[ ]+([^.;]+)")) {
+    if(_vo_rx_cued(" "+s+" ",(" relative to ")," (hour|hours|day|days|week|weeks)[ ]*([+-]?[0-9]+)[ ]+relative[ ]+to[ ]+([^.;]+)")) {
         unit=ustrregexs(1); n=strtoreal(ustrregexs(2)); clause=ustrtrim(ustrregexs(3)); p.reference=_v2_endpoint(clause)
         if(substr(unit,1,4)=="hour") unit="hour"
         else if(substr(unit,1,3)=="day") unit="day"
@@ -842,7 +1278,7 @@ struct vo_v2parse scalar _v2_parse(string scalar raw, string scalar source)
             if(p.unresolved) p.reason="ambiguous_reference_event"
         }
     }
-    if(ustrregexm(s,"temporal hierarchy[ ]*:[ ]*([^.]+)")) {
+    if(_vo_rx_cued(s,("temporal hierarchy"),"temporal hierarchy[ ]*:[ ]*([^.]+)")) {
         clause=ustrregexs(1); chain=_v2_split(clause,">"); p.hierarchy=""; p.kval=J(1,0,.); p.schema="hierarchy"; p.temporal=1; p.unresolved=0
         for(i=1;i<=cols(chain);i++) {
             cur=_v2_endpoint(chain[i])
@@ -855,7 +1291,7 @@ struct vo_v2parse scalar _v2_parse(string scalar raw, string scalar source)
         if(p.temporal) { p.key=invtokens(strofreal(p.kval),":"); p.skey=_vo_sort_key(p.kval); }
         else { p.key="."; p.reason="incomplete_temporal_structure"; }
     }
-    if(ustrregexm(s,"(time order|temporal order|occasion order|measurement order|stage order|phase order|assessment sequence|measurement sequence|stage sequence|phase sequence|occasion sequence|sequence)[ ]*:[ ]*([^.]+)")) {
+    if(_vo_rx_cued(s,(" order"," sequence","sequence"),"(time order|temporal order|occasion order|measurement order|stage order|phase order|assessment sequence|measurement sequence|stage sequence|phase sequence|occasion sequence|sequence)[ ]*:[ ]*([^.]+)")) {
         clause=ustrregexs(2); p.relfrom=p.relto=J(1,0,"")
         if(strpos(clause,"<")) {
             chain=_v2_split(clause,"<")
@@ -875,10 +1311,15 @@ struct vo_v2parse scalar _v2_parse(string scalar raw, string scalar source)
         if(ustrregexm(s,"current[ ]+(stage|occasion|phase)[ ]*:[ ]*([^.;]+)")) p.node=_v2_endpoint(ustrregexs(2))
         p.schema="relation"; p.temporal=(p.node!="" & cols(p.relfrom)>0); p.unresolved=!p.temporal; p.key=(p.node=="" ? "." : p.node); p.skey=""
     }
-    p.family=_v2_construct(raw,p,source)
+    p.family=_v2_construct(raw,norm,p,source)
     if(source=="name" & p.family=="" & ustrlen(b.family)>=2 & (p.temporal | p.negative | p.unresolved | p.invalid | (p.schema=="related" & p.key!="."))) p.family=b.family
     p.evidence=source
     return(p)
+}
+
+struct vo_v2parse scalar _v2_parse(string scalar raw, string scalar source)
+{
+    return(_v2_parse_norm(raw,source,_vo_norm(raw)))
 }
 
 string scalar _v2_cluster(string scalar schema)
@@ -1038,42 +1479,58 @@ string scalar _v2_short_family(string scalar raw)
 void _varorder_make_plan_v2()
 {
     real scalar k,i,j,g,pos,newpos,nmove,maxd,nfchanged,conf,nvalid,nunresolved,collision,gap,hasrel,allnegative,alltemporal,refconf,hierconf,schemaconf,overlap,linkok,cyc,nf,ii,jj,found,changed,limit,maxaudit
-    string scalar canon,chosen,cluster,primary,typesig,ev,common,metatext,afidsout,afnamesout,afstatesout,aftypesout,afevidenceout,afreasonsout,avarsout,avaridsout,avarkeysout,avarevidenceout,avarreasonsout
-    string rowvector vn,fam,ofam,ufam,fmap,grp,state,key,skey,reason,schema,reference,hierarchy,node,evidence,allf,fs,fr,ft,fe,fid,neworder,cfam,labfam,notefam,namefam,vfamily,vdom,vi,eps,from,to,auditids,auditkeys,auditev,schemaset,leftparts,rightparts,familymessages,variablemessages,familytypemessages,familyevidencemessages,variablekeymessages,variableevidencemessages
+    string scalar canon,chosen,cluster,primary,typesig,ev,common,metatext,vlname,labraw,noteraw,gckey,afidsout,afnamesout,afstatesout,aftypesout,afevidenceout,afreasonsout,avarsout,avaridsout,avarkeysout,avarevidenceout,avarreasonsout
+    string rowvector vn,nnorm,lnorm,tnorm,fam,ofam,ufam,fmap,grp,state,key,skey,reason,schema,reference,hierarchy,node,evidence,allf,fs,fr,ft,fe,fid,neworder,cfam,labfam,notefam,namefam,vfamily,vdom,vi,eps,from,to,auditids,auditkeys,auditev,schemaset,leftparts,rightparts,familymessages,variablemessages,familytypemessages,familyevidencemessages,variablekeymessages,variableevidencemessages
     real rowvector anchors,members,emitted,rank,ord,idx,changedmask,kval1,vinfo,tinfo,tempmembers,obsmap,auditvars,issuefamilies,noactionvars
     real matrix A,E,R
     struct vo_v2parse scalar pn,pl,pt,px
     struct vo_v2graph scalar gr
-    k=st_nvar(); vn=fam=grp=state=skey=reason=schema=reference=hierarchy=node=evidence=namefam=labfam=notefam=vfamily=vdom=J(1,k,""); key=J(1,k,"."); kval1=J(1,k,.); vinfo=tinfo=J(1,k,0); rank=J(1,k,.)
+    transmorphic scalar vicache,relfromcache,reltocache,groupcache
+    k=st_nvar(); vn=nnorm=lnorm=tnorm=fam=grp=state=skey=reason=schema=reference=hierarchy=node=evidence=namefam=labfam=notefam=vfamily=vdom=J(1,k,""); key=J(1,k,"."); kval1=J(1,k,.); vinfo=tinfo=J(1,k,0); rank=J(1,k,.)
+    vicache=asarray_create("string",1); relfromcache=asarray_create("string",1); reltocache=asarray_create("string",1)
     for(i=1;i<=k;i++) {
-        vn[i]=st_varname(i)
-        pn=_v2_parse(vn[i],"name")
-        pl=_v2_parse(st_local("__vo_lab"+strofreal(i)),"label")
-        pt=_v2_parse(st_local("__vo_note"+strofreal(i)),"notes")
-        vi=_vo_value_info(st_local("__vo_vlname"+strofreal(i)))
+        vn[i]=st_varname(i); labraw=st_varlabel(i); noteraw=st_local("__vo_note"+strofreal(i))
+        nnorm[i]=_vo_norm(vn[i]); lnorm[i]=_vo_norm(labraw); tnorm[i]=_vo_norm(noteraw)
+        pn=_v2_parse_norm(vn[i],"name",nnorm[i])
+        pl=_v2_parse_norm(labraw,"label",lnorm[i])
+        pt=_v2_parse_norm(noteraw,"notes",tnorm[i])
+        if(cols(pt.relfrom)) { asarray(relfromcache,strofreal(i),pt.relfrom); asarray(reltocache,strofreal(i),pt.relto); }
+        vlname=st_varvaluelabel(i)
+        if(asarray_contains(vicache,vlname)) vi=asarray(vicache,vlname)
+        else { vi=_vo_value_info(vlname); asarray(vicache,vlname,vi); }
         vfamily[i]=vi[1]; vdom[i]=vi[2]; vinfo[i]=strtoreal(vi[3])
         namefam[i]=pn.family; labfam[i]=pl.family; notefam[i]=pt.family
-        if(ustrregexm(_vo_norm(vn[i]),"^(v|var|x|item|q|u|p|r|k|n|c|d|h|b|w) [0-9]+$")) { namefam[i]=""; pn.schema=""; pn.key="."; pn.skey=""; pn.kval=J(1,0,.); pn.temporal=0; pn.negative=0; pn.unresolved=0; pn.invalid=0; }
-        if(pn.schema=="year" & ustrregexm(vn[i],"[[:alpha:]][12][0-9][0-9][0-9]")) { pn.temporal=0; pn.schema="related"; pn.key="."; pn.skey=""; pn.kval=J(1,0,.); pn.unresolved=0; }
-        if(pn.schema=="grade_term" & !(_vo_has(_vo_norm(st_local("__vo_lab"+strofreal(i)))," (grade|developmental|academic term) ") | _vo_has(_vo_norm(st_local("__vo_note"+strofreal(i)))," (grade|developmental|academic term) "))) {
-            pn.temporal=0; pn.unresolved=1; pn.schema="related"; pn.key="."; pn.skey=""; pn.kval=J(1,0,.)
+        if(_v2_opaque_name(nnorm[i])) { namefam[i]=""; pn.schema=""; pn.key="."; pn.skey=""; pn.kval=J(1,0,.); pn.temporal=0; pn.negative=0; pn.unresolved=0; pn.invalid=0; }
+        if(pn.schema=="year") {
+            if(ustrregexm(vn[i],"[[:alpha:]][12][0-9][0-9][0-9]")) { pn.temporal=0; pn.schema="related"; pn.key="."; pn.skey=""; pn.kval=J(1,0,.); pn.unresolved=0; }
         }
-        if(pn.schema=="day_period" & !(strpos(_vo_norm(st_local("__vo_lab"+strofreal(i))),"within day") | strpos(_vo_norm(st_local("__vo_note"+strofreal(i))),"within day"))) {
+        if(pn.schema=="grade_term") {
+            if(!(strpos(" "+lnorm[i]+" "," grade ") | strpos(" "+lnorm[i]+" "," developmental ") | strpos(" "+lnorm[i]+" "," academic term ") | strpos(" "+tnorm[i]+" "," grade ") | strpos(" "+tnorm[i]+" "," developmental ") | strpos(" "+tnorm[i]+" "," academic term "))) {
+                pn.temporal=0; pn.unresolved=1; pn.schema="related"; pn.key="."; pn.skey=""; pn.kval=J(1,0,.)
+            }
+        }
+        if(pn.schema=="day_period" & !(strpos(lnorm[i],"within day") | strpos(tnorm[i],"within day"))) {
             pn.temporal=0; pn.unresolved=1; pn.schema="related"; pn.key="."; pn.skey=""; pn.kval=J(1,0,.)
         }
         if(pn.schema=="related" & (pl.temporal | pt.temporal | pl.unresolved | pt.unresolved | pl.invalid | pt.invalid) & !((labfam[i]!="" & namefam[i]==labfam[i]) | (notefam[i]!="" & namefam[i]==notefam[i]))) namefam[i]=""
-        if(!pn.temporal & !pl.temporal & !pt.temporal & strpos(_vo_norm(st_local("__vo_lab"+strofreal(i))),"repeated measure") & ustrregexm(_vo_norm(vn[i]),"^(.+) ([[:alpha:]]+)$")) {
-            namefam[i]=ustrregexs(1); pn.schema="related"; pn.key=ustrregexs(2); pn.skey=pn.key
+        if(!pn.temporal & !pl.temporal & !pt.temporal & strpos(lnorm[i],"repeated measure")) {
+            if(ustrregexm(nnorm[i],"^(.+) ([[:alpha:]]+)$")) { namefam[i]=ustrregexs(1); pn.schema="related"; pn.key=ustrregexs(2); pn.skey=pn.key; }
         }
         tinfo[i]=(pn.temporal | pl.temporal | pt.temporal)
         conf=0
-        if(namefam[i]!="" & labfam[i]!="" & !_vo_compatible(namefam[i],labfam[i])) { conf=1; reason[i]="construct_conflict"; }
-        if(namefam[i]!="" & notefam[i]!="" & !_vo_compatible(namefam[i],notefam[i])) { conf=1; reason[i]="construct_conflict"; }
-        if(labfam[i]!="" & notefam[i]!="" & !_vo_compatible(labfam[i],notefam[i])) { conf=1; reason[i]="construct_conflict"; }
+        if(namefam[i]!="" & labfam[i]!="") if(!_vo_compatible(namefam[i],labfam[i])) { conf=1; reason[i]="construct_conflict"; }
+        if(namefam[i]!="" & notefam[i]!="") if(!_vo_compatible(namefam[i],notefam[i])) { conf=1; reason[i]="construct_conflict"; }
+        if(labfam[i]!="" & notefam[i]!="") if(!_vo_compatible(labfam[i],notefam[i])) { conf=1; reason[i]="construct_conflict"; }
         chosen=""
         if(namefam[i]!="") chosen=namefam[i]
-        if(labfam[i]!="" & (chosen=="" | (_vo_compatible(chosen,labfam[i]) & ustrlen(labfam[i])<ustrlen(chosen)))) chosen=labfam[i]
-        if(notefam[i]!="" & (chosen=="" | (_vo_compatible(chosen,notefam[i]) & ustrlen(notefam[i])<ustrlen(chosen)))) chosen=notefam[i]
+        if(labfam[i]!="") {
+            if(chosen=="") chosen=labfam[i]
+            else if(_vo_compatible(chosen,labfam[i])) if(ustrlen(labfam[i])<ustrlen(chosen)) chosen=labfam[i]
+        }
+        if(notefam[i]!="") {
+            if(chosen=="") chosen=notefam[i]
+            else if(_vo_compatible(chosen,notefam[i])) if(ustrlen(notefam[i])<ustrlen(chosen)) chosen=notefam[i]
+        }
         if(chosen=="" & vinfo[i]) chosen=vfamily[i]
         fam[i]=chosen
         if(pn.temporal) px=pn
@@ -1110,8 +1567,8 @@ void _varorder_make_plan_v2()
         if(labfam[i]!="" | pl.temporal | pl.negative | pl.unresolved | pl.invalid) evidence[i]=(evidence[i]=="" ? "label" : evidence[i]+"+label")
         if(notefam[i]!="" | pt.temporal | pt.negative | pt.unresolved | pt.invalid) evidence[i]=(evidence[i]=="" ? "notes" : evidence[i]+"+notes")
         if(vinfo[i]) evidence[i]=(evidence[i]=="" ? "value_label" : evidence[i]+"+value_label")
-        metatext=_vo_norm(vn[i]+" "+st_local("__vo_lab"+strofreal(i))+" "+st_local("__vo_note"+strofreal(i)))
-        if(!tinfo[i] & (anyof(("context","location","setting"),fam[i]) | ustrregexm(" "+metatext+" "," (treatment|randomized) arm "))) {
+        metatext=nnorm[i]+" "+lnorm[i]+" "+tnorm[i]
+        if(!tinfo[i] & (anyof(("context","location","setting"),fam[i]) | strpos(" "+metatext+" "," treatment arm ") | strpos(" "+metatext+" "," randomized arm "))) {
             fam[i]=""; namefam[i]=""; labfam[i]=""; notefam[i]=""; schema[i]=""; key[i]="."; skey[i]=""; reason[i]=""; evidence[i]=""; kval1[i]=.
         }
     }
@@ -1163,7 +1620,13 @@ void _varorder_make_plan_v2()
     for(ii=1;ii<=cols(ufam);ii++) {
         canon=ufam[ii]
         cfam=J(1,0,"")
-        for(j=1;j<=k;j++) if(fam[j]==canon & tinfo[j] & schema[j]!="" & schema[j]!="related" & substr(schema[j],1,11)!="unresolved_") cfam=cfam,_v2_group_cluster(schema[j],canon,schema,fam)
+        groupcache=asarray_create("string",1)
+        for(j=1;j<=k;j++) if(fam[j]==canon & tinfo[j] & schema[j]!="" & schema[j]!="related" & substr(schema[j],1,11)!="unresolved_") {
+            gckey=schema[j]
+            if(asarray_contains(groupcache,gckey)) cluster=asarray(groupcache,gckey)
+            else { cluster=_v2_group_cluster(schema[j],canon,schema,fam); asarray(groupcache,gckey,cluster); }
+            cfam=cfam,cluster
+        }
         if(cols(cfam)) cfam=uniqrows(sort(cfam',1))'
         tempmembers=_v2_which((fam:==canon) :& (tinfo:==0))
         for(jj=1;jj<=cols(tempmembers);jj++) {
@@ -1179,9 +1642,14 @@ void _varorder_make_plan_v2()
             else if(cols(cfam)>1 & reason[i]!="explicit_non_temporal") reason[i]="overlapping_family_membership"
         }
     }
+    groupcache=asarray_create("string",1)
     for(i=1;i<=k;i++) if(fam[i]!="") {
-        cluster=_v2_group_cluster(schema[i],fam[i],schema,fam)
-        if(substr(schema[i],1,11)=="unresolved_") cluster=_v2_group_cluster(substr(schema[i],12,.),fam[i],schema,fam)
+        gckey=fam[i]+"||"+(substr(schema[i],1,11)=="unresolved_" ? substr(schema[i],12,.) : schema[i])
+        if(asarray_contains(groupcache,gckey)) cluster=asarray(groupcache,gckey)
+        else {
+            cluster=_v2_group_cluster((substr(schema[i],1,11)=="unresolved_" ? substr(schema[i],12,.) : schema[i]),fam[i],schema,fam)
+            asarray(groupcache,gckey,cluster)
+        }
         if(reason[i]=="explicit_non_temporal" & schema[i]=="") cluster="related"
         grp[i]=fam[i]+"@"+cluster
     }
@@ -1219,7 +1687,7 @@ void _varorder_make_plan_v2()
         if(primary=="" & hierconf) primary="hierarchy_conflict"
         if(primary=="" & refconf) primary="reference_conflict"
         if(primary=="" & anyof(reason[members],"ambiguous_reference_event")) primary="ambiguous_reference_event"
-        for(j=1;j<=k;j++) if(reason[j]=="overlapping_family_membership" & _vo_compatible(fam[j],canon)) overlap=1
+        for(j=1;j<=k;j++) if(reason[j]=="overlapping_family_membership") if(_vo_compatible(fam[j],canon)) overlap=1
         if(primary=="" & overlap) primary="overlapping_family_membership"
         if(primary=="" & collision) primary="normalized_key_collision"
         if(primary=="" & anyof(reason[members],"incomplete_temporal_structure")) primary="incomplete_temporal_structure"
@@ -1236,9 +1704,10 @@ void _varorder_make_plan_v2()
             if(hasrel) {
                 eps=J(1,0,""); from=to=J(1,0,"")
                 for(i=1;i<=cols(members);i++) {
-                    pt=_v2_parse(st_local("__vo_note"+strofreal(members[i])),"notes")
-                    if(pt.node!="") eps=eps,pt.node
-                    if(cols(pt.relfrom)) { from=from,pt.relfrom; to=to,pt.relto; eps=eps,pt.relfrom,pt.relto; }
+                    if(node[members[i]]!="") eps=eps,node[members[i]]
+                    if(asarray_contains(relfromcache,strofreal(members[i]))) {
+                        leftparts=asarray(relfromcache,strofreal(members[i])); rightparts=asarray(reltocache,strofreal(members[i])); from=from,leftparts; to=to,rightparts; eps=eps,leftparts,rightparts
+                    }
                 }
                 if(cols(eps)) eps=uniqrows(sort(eps',1))'
                 E=J(cols(eps),cols(eps),0)
@@ -1389,4 +1858,6 @@ void _varorder_extra_identity(string scalar canonical)
     }
     st_local("__vo_extra_identity",strofreal(hash1(parts'),"%21x"))
 }
+VARORDER_V2_DROP_TOKENS=("a","id","score","scores","measure","measures","measurement","measurements","repeated","assessment","assessments","outcome","outcomes","calendar","year","quarter","month","date","convention","dmy","mdy","ymd","day","days","hour","hours","week","weeks","relative","to","at","then","related","fiscal","fy","grade","academic","term","semester","developmental","within","period","cycle","visit","time","wave","t","q","m","g","pre","mid","post","pretest","posttest","baseline","screening","discharge","followup","follow","up","before","during","after","treatment","current","stage","phase","occasion","unknown","unspecified","construct","hierarchy","order","sequence","questionnaire","item","form","batch","identifier","not","temporal","january","jan","february","feb","march","mar","april","apr","may","june","jun","july","jul","august","aug","september","sept","sep","october","oct","november","nov","december","dec","fall","spring","morning","afternoon","evening")
+VARORDER_V2_RESERVED_TOKENS=("t","q","m","g","pre","mid","post","pretest","posttest","baseline","screening","discharge","followup","follow","before","during","after","time","wave","visit","occasion","phase","stage","temporal","hierarchy","order","sequence","relative","hour","hours","day","days","week","weeks","year","quarter","month","fiscal","fy","grade","academic","term","semester","cycle","morning","afternoon","evening","date","dmy","mdy","ymd","questionnaire","batch")
 end
